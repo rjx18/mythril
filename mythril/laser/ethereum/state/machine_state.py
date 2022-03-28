@@ -90,6 +90,17 @@ class MachineStack(list):
         """
         raise NotImplementedError("Implement this if needed")
 
+class MachineGasMeter:
+    """
+    MachineGasMeter represents current machine gas meter statistics.
+    """
+    def __init__(self, min_opcode_gas_used=0, max_opcode_gas_used=0, mem_gas_used=0):
+        self.min_opcode_gas_used = min_opcode_gas_used
+        self.max_opcode_gas_used = max_opcode_gas_used
+        self.mem_gas_used = mem_gas_used
+
+    def __copy__(self):
+        return MachineGasMeter(min_opcode_gas_used=self.min_opcode_gas_used, max_opcode_gas_used=self.max_opcode_gas_used, mem_gas_used=self.mem_gas_used)
 
 class MachineState:
     """
@@ -103,6 +114,7 @@ class MachineState:
         stack=None,
         subroutine_stack=None,
         memory: Optional[Memory] = None,
+        pc_gas_meter=None,
         constraints=None,
         depth=0,
         max_gas_used=0,
@@ -128,6 +140,7 @@ class MachineState:
         self.gas_limit = gas_limit
         self.min_gas_used = min_gas_used  # lower gas usage bound
         self.max_gas_used = max_gas_used  # upper gas usage bound
+        self.pc_gas_meter = pc_gas_meter or dict()
         self.depth = depth
         self.prev_pc = prev_pc  # holds context of current pc
 
@@ -170,7 +183,7 @@ class MachineState:
         if self.min_gas_used > self.gas_limit:
             raise OutOfGasException()
 
-    def mem_extend(self, start: Union[int, BitVec], size: Union[int, BitVec]) -> None:
+    def mem_extend(self, start: Union[int, BitVec], size: Union[int, BitVec], pc=None) -> None:
         """Extends the memory of this machine state.
 
         :param start: Start of memory extension
@@ -189,16 +202,24 @@ class MachineState:
             extend_gas = self.calculate_memory_gas(start, size)
             self.min_gas_used += extend_gas
             self.max_gas_used += extend_gas
+            
+            if pc:
+                # print("MY_DEBUG total mem gas dict " + str(self))
+                gas_meter = self.pc_gas_meter.get(pc, MachineGasMeter())
+                gas_meter.mem_gas_used += extend_gas
+                self.pc_gas_meter[pc] = gas_meter
+                print("MY_DEBUG total mem gas for pc " + str(pc) + " is "+ str(gas_meter.mem_gas_used))
+                
             self.check_gas()
             self.memory.extend(m_extend)
 
-    def memory_write(self, offset: int, data: List[Union[int, BitVec]]) -> None:
+    def memory_write(self, offset: int, data: List[Union[int, BitVec]], pc=None) -> int:
         """Writes data to memory starting at offset.
 
         :param offset:
         :param data:
         """
-        self.mem_extend(offset, len(data))
+        self.mem_extend(offset, len(data), pc)
         self.memory[offset : offset + len(data)] = data
 
     def pop(self, amount=1) -> Union[BitVec, List[BitVec]]:
@@ -228,6 +249,7 @@ class MachineState:
             pc=self._pc,
             stack=copy(self.stack),
             memory=copy(self.memory),
+            pc_gas_meter=copy(self.pc_gas_meter),
             depth=self.depth,
             prev_pc=self.prev_pc,
             subroutine_stack=copy(self.subroutine_stack),
@@ -274,6 +296,7 @@ class MachineState:
             memory=self.memory,
             memsize=self.memory_size,
             gas=self.gas_limit,
+            pc_gas_meter=self.pc_gas_meter,
             max_gas_used=self.max_gas_used,
             min_gas_used=self.min_gas_used,
             prev_pc=self.prev_pc,

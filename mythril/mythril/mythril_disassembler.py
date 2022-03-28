@@ -13,7 +13,7 @@ from mythril.support import signatures
 from mythril.support.support_utils import rzpad
 from mythril.ethereum.evmcontract import EVMContract
 from mythril.ethereum.interface.rpc.exceptions import ConnectionError
-from mythril.solidity.soliditycontract import SolidityContract, get_contracts_from_file
+from mythril.solidity.soliditycontract import SolidityContract, get_contracts_from_file, get_contracts_from_json
 from eth_utils import int_to_big_endian
 
 
@@ -155,6 +155,81 @@ class MythrilDisassembler:
                 )
             )
         return address, self.contracts[-1]  # return address and contract object
+
+    def load_from_solidity_json(
+        self, solidity_json: List, solidity_files: List[str], solidity_file_contents: List[str]
+    ) -> Tuple[str, List[SolidityContract]]:
+        """
+
+        :param solidity_files: List of solidity_files
+        :return: tuple of address, contract class list
+        """
+        address = util.get_indexed_address(0)
+        contracts = []
+        for i in range(len(solidity_json)):
+            json = solidity_json[i]
+            file = solidity_files[i]
+            file_contents = solidity_file_contents[i]
+            
+            if ":" in file:
+                file, contract_name = file.split(":")
+            else:
+                contract_name = None
+            try:
+                # import signatures from solidity source
+                self.sigs.import_solidity_json(
+                    json,
+                    file
+                )
+                if contract_name is not None:
+                    contract = SolidityContract(
+                        input_file=file,
+                        name=contract_name,
+                        compiled_json=json,
+                        input_file_contents=file_contents
+                    )
+                    self.contracts.append(contract)
+                    contracts.append(contract)
+                else:
+                    for contract in get_contracts_from_json(
+                        compiled_json=json,
+                        input_file=file,
+                        input_file_contents=file_contents
+                    ):
+                        self.contracts.append(contract)
+                        contracts.append(contract)
+
+            except FileNotFoundError as e:
+                raise CriticalError(f"Input file not found {e}")
+            except CompilerError as e:
+                error_msg = str(e)
+                # Check if error is related to solidity version mismatch
+                if (
+                    "Error: Source file requires different compiler version"
+                    in error_msg
+                ):
+                    # Grab relevant line "pragma solidity <solv>...", excluding any comments
+                    solv_pragma_line = error_msg.split("\n")[-3].split("//")[0]
+                    # Grab solidity version from relevant line
+                    solv_match = re.findall(r"[0-9]+\.[0-9]+\.[0-9]+", solv_pragma_line)
+                    error_suggestion = (
+                        "<version_number>" if len(solv_match) != 1 else solv_match[0]
+                    )
+                    error_msg = (
+                        error_msg
+                        + '\nSolidityVersionMismatch: Try adding the option "--solv '
+                        + error_suggestion
+                        + '"\n'
+                    )
+
+                raise CriticalError(error_msg)
+            except NoContractFoundError:
+                log.error(
+                    "The file " + file + " does not contain a compilable contract."
+                )
+
+        return address, contracts
+
 
     def load_from_solidity(
         self, solidity_files: List[str]

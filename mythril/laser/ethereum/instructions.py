@@ -52,6 +52,7 @@ from mythril.laser.ethereum.evm_exceptions import (
 )
 from mythril.laser.ethereum.instruction_data import get_opcode_gas, calculate_sha3_gas
 from mythril.laser.ethereum.state.global_state import GlobalState
+from mythril.laser.ethereum.state.machine_state import MachineGasMeter
 from mythril.laser.ethereum.transaction import (
     MessageCallTransaction,
     TransactionStartSignal,
@@ -62,6 +63,8 @@ from mythril.laser.ethereum.transaction import (
 from mythril.support.support_utils import get_code_hash
 
 from mythril.support.loader import DynLoader
+
+from mythril.support.signatures import SignatureDB
 
 log = logging.getLogger(__name__)
 
@@ -169,6 +172,15 @@ class StateTransition(object):
         min_gas, max_gas = get_opcode_gas(opcode)
         global_state.mstate.min_gas_used += min_gas
         global_state.mstate.max_gas_used += max_gas
+        pc = global_state.instruction["address"]
+        
+        gas_meter = global_state.mstate.pc_gas_meter.get(pc, MachineGasMeter())
+        gas_meter.min_opcode_gas_used += min_gas
+        gas_meter.max_opcode_gas_used += max_gas
+        global_state.mstate.pc_gas_meter[pc] = gas_meter
+        
+        print("MY_DEBUG current max gas for pc " + str(pc) + " is " + str(global_state.mstate.pc_gas_meter[pc].max_opcode_gas_used))
+        
         self.check_gas_usage_limit(global_state)
 
         return global_state
@@ -260,6 +272,9 @@ class Instruction:
         self._execute_pre_hooks(global_state)
         result = instruction_mutator(global_state)
         self._execute_post_hooks(global_state)
+        
+        print("Num global state annotations: " + str(global_state.annotations))
+        print("Num result annotations: " + str(result[0].annotations))
 
         return result
 
@@ -281,6 +296,27 @@ class Instruction:
         """
         push_instruction = global_state.get_current_instruction()
         push_value = push_instruction["argument"]
+        
+        signatures = SignatureDB()
+        
+        print(signatures.solidity_sigs.keys())
+        print(push_value)
+        
+        if (global_state.current_function == None):
+            if type(push_value) == tuple:
+                parsed_value = "0x"
+                for byte in push_value:
+                    parsed_byte = '{:02x}'.format(byte)
+                    parsed_value += parsed_byte
+            else: 
+                parsed_value = push_value.lower()
+        
+            print(parsed_value)
+            
+            if (parsed_value in signatures.solidity_sigs and global_state.environment.code.instruction_list[global_state.mstate.pc + 1]["opcode"] == "EQ"):
+                global_state.last_seen_function = parsed_value
+                print(f'MY_DEBUG Found a function being pushed: {parsed_value}')
+        
         try:
             length_of_value = 2 * int(push_instruction["opcode"][4:])
         except ValueError:
@@ -801,7 +837,7 @@ class Instruction:
         return [global_state]
 
     @staticmethod
-    def _calldata_copy_helper(global_state, mstate, mstart, dstart, size):
+    def _calldata_copy_helper(global_state: GlobalState, mstate, mstart, dstart, size):
         environment = global_state.environment
 
         try:
@@ -825,10 +861,10 @@ class Instruction:
         size = cast(int, size)
         if size > 0:
             try:
-                mstate.mem_extend(mstart, size)
+                mstate.mem_extend(mstart, size, global_state.instruction["address"])
             except TypeError as e:
                 log.debug("Memory allocation error: {}".format(e))
-                mstate.mem_extend(mstart, 1)
+                mstate.mem_extend(mstart, 1, global_state.instruction["address"])
                 mstate.memory[mstart] = global_state.new_bitvec(
                     "calldata_"
                     + str(environment.active_account.contract_name)
@@ -997,6 +1033,12 @@ class Instruction:
         min_gas, max_gas = calculate_sha3_gas(length)
         global_state.mstate.min_gas_used += min_gas
         global_state.mstate.max_gas_used += max_gas
+        
+        pc = global_state.instruction["address"]
+        gas_meter = global_state.mstate.pc_gas_meter.get(pc, MachineGasMeter())
+        gas_meter.min_opcode_gas_used += min_gas
+        gas_meter.max_opcode_gas_used += max_gas
+        global_state.mstate.pc_gas_meter[pc] = gas_meter
         StateTransition.check_gas_usage_limit(global_state)
         return global_state
 
@@ -1019,7 +1061,7 @@ class Instruction:
             global_state.world_state.constraints.append(op1 == length)
         Instruction._sha3_gas_helper(global_state, length)
 
-        state.mem_extend(index, length)
+        state.mem_extend(index, length, global_state.instruction["address"])
         data_list = [
             b if isinstance(b, BitVec) else symbol_factory.BitVecVal(b, 8)
             for b in state.memory[index : index + length]
@@ -1183,11 +1225,11 @@ class Instruction:
 
         try:
             concrete_size = helper.get_concrete_int(size)
-            global_state.mstate.mem_extend(concrete_memory_offset, concrete_size)
+            global_state.mstate.mem_extend(concrete_memory_offset, concrete_size, global_state.instruction["address"])
 
         except TypeError:
             # except both attribute error and Exception
-            global_state.mstate.mem_extend(concrete_memory_offset, 1)
+            global_state.mstate.mem_extend(concrete_memory_offset, 1, global_state.instruction["address"])
             global_state.mstate.memory[
                 concrete_memory_offset
             ] = global_state.new_bitvec(
@@ -1202,7 +1244,7 @@ class Instruction:
             concrete_code_offset = helper.get_concrete_int(code_offset)
         except TypeError:
             log.debug("Unsupported symbolic code offset in {}".format(op))
-            global_state.mstate.mem_extend(concrete_memory_offset, concrete_size)
+            global_state.mstate.mem_extend(concrete_memory_offset, concrete_size, global_state.instruction["address"])
             for i in range(concrete_size):
                 global_state.mstate.memory[
                     concrete_memory_offset + i
@@ -1325,7 +1367,7 @@ class Instruction:
         if global_state.last_return_data is None:
             return [global_state]
 
-        global_state.mstate.mem_extend(concrete_memory_offset, concrete_size)
+        global_state.mstate.mem_extend(concrete_memory_offset, concrete_size, global_state.instruction["address"])
         for i in range(concrete_size):
             global_state.mstate.memory[concrete_memory_offset + i] = (
                 global_state.last_return_data[concrete_return_offset + i]
@@ -1431,7 +1473,7 @@ class Instruction:
         state = global_state.mstate
         offset = state.stack.pop()
 
-        state.mem_extend(offset, 32)
+        state.mem_extend(offset, 32, global_state.instruction["address"])
         data = state.memory.get_word_at(offset)
         state.stack.append(data)
         return [global_state]
@@ -1447,7 +1489,7 @@ class Instruction:
         mstart, value = state.stack.pop(), state.stack.pop()
 
         try:
-            state.mem_extend(mstart, 32)
+            state.mem_extend(mstart, 32, global_state.instruction["address"])
         except Exception:
             log.debug("Error extending memory")
 
@@ -1465,7 +1507,7 @@ class Instruction:
         state = global_state.mstate
         offset, value = state.stack.pop(), state.stack.pop()
 
-        state.mem_extend(offset, 1)
+        state.mem_extend(offset, 1, global_state.instruction["address"])
 
         try:
             value_to_write = (
@@ -1535,6 +1577,12 @@ class Instruction:
         min_gas, max_gas = get_opcode_gas("JUMP")
         new_state.mstate.min_gas_used += min_gas
         new_state.mstate.max_gas_used += max_gas
+        
+        pc = new_state.instruction["address"]
+        gas_meter = new_state.mstate.pc_gas_meter.get(pc, MachineGasMeter())
+        gas_meter.min_opcode_gas_used += min_gas
+        gas_meter.max_opcode_gas_used += max_gas
+        new_state.mstate.pc_gas_meter[pc] = gas_meter
 
         # manually set PC to destination
         new_state.mstate.pc = index
@@ -1563,6 +1611,14 @@ class Instruction:
             global_state.mstate.pc += 1
             global_state.mstate.min_gas_used += min_gas
             global_state.mstate.max_gas_used += max_gas
+            
+            pc = global_state.instruction["address"]
+            gas_meter = global_state.mstate.pc_gas_meter.get(pc, MachineGasMeter())
+            gas_meter.min_opcode_gas_used += min_gas
+            gas_meter.max_opcode_gas_used += max_gas
+            global_state.mstate.pc_gas_meter[pc] = gas_meter
+            global_state.last_seen_function = None
+                        
             return [global_state]
 
         # False case
@@ -1586,11 +1642,18 @@ class Instruction:
             # add JUMPI gas cost
             new_state.mstate.min_gas_used += min_gas
             new_state.mstate.max_gas_used += max_gas
+            
+            pc = new_state.instruction["address"]
+            gas_meter = new_state.mstate.pc_gas_meter.get(pc, MachineGasMeter())
+            gas_meter.min_opcode_gas_used += min_gas
+            gas_meter.max_opcode_gas_used += max_gas
+            new_state.mstate.pc_gas_meter[pc] = gas_meter
 
             # manually increment PC
             new_state.mstate.depth += 1
             new_state.mstate.pc += 1
-            new_state.world_state.constraints.append(negated)
+            new_state.world_state.constraints.append(negated) # possibly simplify world state constraints?
+            new_state.last_seen_function = None
             states.append(new_state)
         else:
             log.debug("Pruned unreachable states.")
@@ -1612,11 +1675,21 @@ class Instruction:
                 # add JUMPI gas cost
                 new_state.mstate.min_gas_used += min_gas
                 new_state.mstate.max_gas_used += max_gas
+                
+                pc = new_state.instruction["address"]
+                gas_meter = new_state.mstate.pc_gas_meter.get(pc, MachineGasMeter())
+                gas_meter.min_opcode_gas_used += min_gas
+                gas_meter.max_opcode_gas_used += max_gas
+                new_state.mstate.pc_gas_meter[pc] = gas_meter
 
                 # manually set PC to destination
                 new_state.mstate.pc = index
                 new_state.mstate.depth += 1
                 new_state.world_state.constraints.append(condi)
+                if new_state.last_seen_function != None and new_state.current_function == None:
+                    new_state.current_function = new_state.last_seen_function
+                    new_state.last_seen_function = None
+                    print(f'MY_DEBUG Jumping into function: {new_state.current_function}')
                 states.append(new_state)
             else:
                 log.debug("Pruned unreachable states.")
@@ -1854,7 +1927,7 @@ class Instruction:
             return_data = [global_state.new_bitvec("return_data", 8)]
             log.debug("Return with symbolic length or offset. Not supported")
         else:
-            state.mem_extend(offset, length)
+            state.mem_extend(offset, length, global_state.instruction["address"])
             StateTransition.check_gas_usage_limit(global_state)
             return_data = state.memory[offset : offset + length]
         global_state.current_transaction.end(global_state, return_data)
@@ -2168,7 +2241,7 @@ class Instruction:
 
         # Copy memory
         global_state.mstate.mem_extend(
-            memory_out_offset, min(memory_out_size, len(global_state.last_return_data))
+            memory_out_offset, min(memory_out_size, len(global_state.last_return_data)), global_state.instruction["address"]
         )
         for i in range(min(memory_out_size, len(global_state.last_return_data))):
             global_state.mstate.memory[
@@ -2309,7 +2382,7 @@ class Instruction:
 
             # Copy memory
         global_state.mstate.mem_extend(
-            memory_out_offset, min(memory_out_size, len(global_state.last_return_data))
+            memory_out_offset, min(memory_out_size, len(global_state.last_return_data)), global_state.instruction["address"]
         )
         for i in range(min(memory_out_size, len(global_state.last_return_data))):
             global_state.mstate.memory[
@@ -2452,7 +2525,7 @@ class Instruction:
 
         # Copy memory
         global_state.mstate.mem_extend(
-            memory_out_offset, min(memory_out_size, len(global_state.last_return_data))
+            memory_out_offset, min(memory_out_size, len(global_state.last_return_data)), global_state.instruction["address"]
         )
         for i in range(min(memory_out_size, len(global_state.last_return_data))):
             global_state.mstate.memory[

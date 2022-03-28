@@ -23,6 +23,32 @@ class MutationAnnotation(StateAnnotation):
     def persist_over_calls(self) -> bool:
         return True
 
+class FunctionTrackerAnnotation(MergeableStateAnnotation):
+    """Function Gas Meter Annotation
+
+    This annotation tracks current function.
+    """
+
+    def __init__(self):
+        self.current_function = None  # type: str or None
+        self.last_seen_function = None
+
+    def __copy__(self):
+        result = FunctionTrackerAnnotation()
+        result.current_function = self.current_function
+        result.last_seen_function = self.last_seen_function
+        return result
+
+    def check_merge_annotation(self, other: "FunctionTrackerAnnotation"):
+        if not isinstance(other, FunctionTrackerAnnotation):
+            raise TypeError("Expected an instance of FunctionTrackerAnnotation")
+        return self.current_function == other.current_function and self.last_seen_function == other.last_seen_function
+
+    def merge_annotation(self, other: "FunctionTrackerAnnotation"):
+        merged_annotation = FunctionTrackerAnnotation()
+        merged_annotation.current_function = self.current_function
+        merged_annotation.last_seen_function = self.last_seen_function
+        return merged_annotation
 
 class DependencyAnnotation(MergeableStateAnnotation):
     """Dependency Annotation

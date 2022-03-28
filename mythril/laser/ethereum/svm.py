@@ -38,7 +38,6 @@ class SVMError(Exception):
 
     pass
 
-
 class LaserEVM:
     """The LASER EVM.
 
@@ -106,6 +105,13 @@ class LaserEVM:
 
         self._start_sym_exec_hooks = []  # type: List[Callable]
         self._stop_sym_exec_hooks = []  # type: List[Callable]
+        
+        self.creation_transaction_states = []
+        self.runtime_transaction_states = []
+        
+        self.function_gas_meter = {}
+        
+        self.current_transaction_states = None
 
         self.iprof = iprof
         self.instr_pre_hook = {}  # type: Dict[str, List[Callable]]
@@ -194,6 +200,8 @@ class LaserEVM:
         :return:
         """
         self.time = datetime.now()
+        
+        self.current_transaction_states = self.runtime_transaction_states
 
         for i in range(self.transaction_count):
             if len(self.open_states) == 0:
@@ -214,10 +222,13 @@ class LaserEVM:
             for hook in self._start_sym_trans_hooks:
                 hook()
 
+            print("MY_DEBUG starting new transaction, num states: " + str(len(self.open_states)) + " , num strats: " + str(len(self.work_list)))
             execute_message_call(self, address)
-
+            
             for hook in self._stop_sym_trans_hooks:
                 hook()
+                
+        # print("Total final states collected = " + str(len(self.transaction_final_states)))
 
     def _check_create_termination(self) -> bool:
         if len(self.open_states) != 0:
@@ -241,8 +252,11 @@ class LaserEVM:
         :return:
         """
         final_states = []  # type: List[GlobalState]
-
+        
+        # print("MY_DEBUG running exec num instructions " + str(len()))
+        
         for global_state in self.strategy:
+            # print("MY_DEBUG executing new state, num instructions " + str(len(global_state.environment.code.instruction_list)))
             if create and self._check_create_termination():
                 log.debug("Hit create timeout, returning.")
                 return final_states + [global_state] if track_gas else None
@@ -266,7 +280,7 @@ class LaserEVM:
 
             self.manage_cfg(op_code, new_states)  # TODO: What about op_code is None?
             if new_states:
-                self.work_list += new_states
+                self.work_list += new_states # appends to work list, which the outer for loop iterates on (mutating while iterating)
             elif track_gas:
                 final_states.append(global_state)
             self.total_states += len(new_states)
@@ -321,6 +335,9 @@ class LaserEVM:
         except IndexError:
             self._add_world_state(global_state)
             return [], None
+        
+        print("MY_DEBUG executing new opcode: " + op_code )
+        
         if len(global_state.mstate.stack) < get_required_stack_elements(op_code):
             error_msg = (
                 "Stack Underflow Exception due to insufficient "
@@ -375,6 +392,8 @@ class LaserEVM:
 
             log.debug("Ending transaction %s.", transaction)
             if return_global_state is None:
+                current_function = end_signal.global_state.current_function or "None"
+                print("Ending transaction for function " + current_function + ", but return_global_state is none, max gas used is " + str(end_signal.global_state.mstate.max_gas_used) + " and num final states are " + str(len(self.current_transaction_states)))
                 if (
                     not isinstance(transaction, ContractCreationTransaction)
                     or transaction.return_data
@@ -383,10 +402,16 @@ class LaserEVM:
                     end_signal.global_state.world_state.node = global_state.node
                     self._add_world_state(end_signal.global_state)
 
+                self.current_transaction_states.append(end_signal.global_state)
+                if (end_signal.global_state.current_function != None):
+                    prev_max_gas = self.function_gas_meter.get(end_signal.global_state.current_function, 0)
+                    self.function_gas_meter[end_signal.global_state.current_function] = max(prev_max_gas, end_signal.global_state.mstate.max_gas_used)
+
                 new_global_states = []
             else:
                 # First execute the post hook for the transaction ending instruction
                 self._execute_post_hook(op_code, [end_signal.global_state])
+                print("Ending transaction, and return_global_state is not none")
 
                 # Propagate annotations
                 new_annotations = [
@@ -404,6 +429,8 @@ class LaserEVM:
                 )
 
         self._execute_post_hook(op_code, new_global_states)
+        
+        print("MY_DEBUG executing next states: " + str(len(new_global_states)) )
 
         return new_global_states, op_code
 
@@ -430,6 +457,8 @@ class LaserEVM:
         op_code = return_global_state.environment.code.instruction_list[
             return_global_state.mstate.pc
         ]["opcode"]
+        
+        print("MY_DEBUG transaction resuming opcode is " + op_code + " at " + str(return_global_state.mstate.pc))
 
         # Set execution result in the return_state
         return_global_state.last_return_data = return_data

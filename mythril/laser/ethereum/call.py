@@ -22,6 +22,7 @@ from mythril.laser.smt import BitVec, If
 from mythril.laser.smt import simplify, Expression, symbol_factory
 from mythril.support.loader import DynLoader
 
+from mythril.laser.ethereum.state.machine_state import MachineGasMeter
 """
 This module contains the business logic used by Instruction in instructions.py
 to get the necessary elements from the stack and determine the parameters for the new global state.
@@ -232,7 +233,14 @@ def native_call(
     )
     global_state.mstate.min_gas_used += native_gas_min
     global_state.mstate.max_gas_used += native_gas_max
-    global_state.mstate.mem_extend(mem_out_start, mem_out_sz)
+    
+    pc = global_state.instruction["address"]
+    gas_meter = global_state.mstate.pc_gas_meter.get(pc, MachineGasMeter())
+    gas_meter.min_opcode_gas_used += native_gas_min
+    gas_meter.max_opcode_gas_used += native_gas_max
+    global_state.mstate.pc_gas_meter[pc] = gas_meter
+    
+    global_state.mstate.mem_extend(mem_out_start, mem_out_sz, global_state.instruction["address"])
 
     try:
         data = natives.native_contracts(call_address_int, call_data)

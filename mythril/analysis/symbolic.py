@@ -22,6 +22,7 @@ from mythril.laser.plugin.loader import LaserPluginLoader
 from mythril.laser.plugin.plugins import (
     MutationPrunerBuilder,
     DependencyPrunerBuilder,
+    FunctionTrackerBuilder,
     CoveragePluginBuilder,
     CallDepthLimitBuilder,
     InstructionProfilerBuilder,
@@ -126,19 +127,24 @@ class SymExecWrapper:
         if loop_bound is not None:
             self.laser.extend_strategy(BoundedLoopsStrategy, loop_bound)
 
-        plugin_loader = LaserPluginLoader()
-        plugin_loader.load(CoveragePluginBuilder())
-        plugin_loader.load(MutationPrunerBuilder())
-        plugin_loader.load(CallDepthLimitBuilder())
-        plugin_loader.load(InstructionProfilerBuilder())
-        plugin_loader.add_args(
+        self.plugin_loader = LaserPluginLoader()
+        self.plugin_loader.load(CoveragePluginBuilder())
+        self.plugin_loader.load(MutationPrunerBuilder())
+        self.plugin_loader.load(CallDepthLimitBuilder())
+        self.plugin_loader.load(InstructionProfilerBuilder())
+        self.plugin_loader.add_args(
             "call-depth-limit", call_depth_limit=args.call_depth_limit
         )
 
         if not disable_dependency_pruning:
-            plugin_loader.load(DependencyPrunerBuilder())
+            self.plugin_loader.load(DependencyPrunerBuilder())
+        
+        # Function tracker
+        self.plugin_loader.load(FunctionTrackerBuilder())
+        
+        self.plugin_loader.instrument_virtual_machine(self.laser, None)
 
-        plugin_loader.instrument_virtual_machine(self.laser, None)
+        
 
         world_state = WorldState()
         for account in self.accounts.values():

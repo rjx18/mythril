@@ -138,6 +138,7 @@ class MythrilAnalyzer:
         :param transaction_count: The amount of transactions to be executed
         :return: The Report class which contains the all the issues/vulnerabilities
         """
+        # print("MY_DEBUG Firing lasers!")
         all_issues = []  # type: List[Issue]
         SolverStatistics().enabled = True
         exceptions = []

@@ -94,7 +94,7 @@ def execute_message_call(laser_evm, callee_address: BitVec) -> None:
             gas_price=symbol_factory.BitVecSym(
                 "gas_price{}".format(next_transaction_id), 256
             ),
-            gas_limit=8000000,  # block gas limit
+            gas_limit=15000000,  # block gas limit
             origin=external_sender,
             caller=external_sender,
             callee_account=open_world_state[callee_address],
@@ -104,6 +104,8 @@ def execute_message_call(laser_evm, callee_address: BitVec) -> None:
             ),
         )
         _setup_global_state_for_execution(laser_evm, transaction)
+        
+        # print("Set up global state, instructions: " + str(laser_evm.work_list[0].environment.code.instruction_list))
 
     laser_evm.exec()
 
@@ -124,6 +126,8 @@ def execute_contract_creation(
     world_state = world_state or WorldState()
     open_states = [world_state]
     new_account = None
+    
+    laser_evm.current_transaction_states = laser_evm.creation_transaction_states
     for open_world_state in open_states:
         next_transaction_id = get_next_transaction_id()
         # call_data "should" be '[]', but it is easier to model the calldata symbolically

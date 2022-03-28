@@ -688,6 +688,13 @@ def load_code(disassembler: MythrilDisassembler, args: Namespace):
     elif args.__dict__.get("address", False):
         # Get bytecode from a contract address
         address, _ = disassembler.load_from_address(args.address)
+    elif args.__dict__.get("solidity_json", False):
+        # Compile Solidity source file(s)
+        address, _ = disassembler.load_from_solidity_json(
+            args.solidity_json,
+            args.solidity_files,
+            args.solidity_file_contents
+        )  # list of files
     elif args.__dict__.get("solidity_files", False):
         # Compile Solidity source file(s)
         if args.command in ANALYZE_LIST and args.graph and len(args.solidity_files) > 1:
@@ -847,7 +854,6 @@ def execute_command(
                 exit_with_error(args.outform, "Error saving graph: " + str(e))
 
         elif args.statespace_json:
-
             if not analyzer.contracts:
                 exit_with_error(
                     args.outform, "input files do not contain any valid contracts"

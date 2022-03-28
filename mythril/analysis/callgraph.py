@@ -140,10 +140,17 @@ def extract_nodes(statespace):
         code_split = []
         for instruction in instructions:
             if instruction["opcode"].startswith("PUSH"):
+                argument_to_append = ""
+                if isinstance(instruction["argument"], str):
+                    argument_to_append = instruction["argument"]
+                else:
+                    argument_to_append = "0x"
+                    for word in instruction["argument"]:
+                        argument_to_append += '{0:0{1}x}'.format(word,2)
                 code_line = "%d %s %s" % (
                     instruction["address"],
                     instruction["opcode"],
-                    instruction["argument"],
+                    argument_to_append,
                 )
             elif (
                 instruction["opcode"].startswith("JUMPDEST")

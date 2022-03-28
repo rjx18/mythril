@@ -250,6 +250,28 @@ class SignatureDB(object, metaclass=Singleton):
                     self.solidity_sigs[sig] = [name]
                 self.add(sig, name)
 
+    def import_solidity_json(
+        self, json, file_path: str
+    ):
+        """Import Function Signatures from solidity source files.
+            Can only import one contract at a time
+
+        :param solc_binary:
+        :param solc_settings_json:
+        :param file_path: solidity source code file path
+        :return:
+        """
+        solc_json = json
+
+        for contract in solc_json["contracts"][file_path].values():
+            for name, hash_ in contract["evm"]["methodIdentifiers"].items():
+                sig = "0x{}".format(hash_)
+                if sig in self.solidity_sigs:
+                    self.solidity_sigs[sig].append(name)
+                else:
+                    self.solidity_sigs[sig] = [name]
+                self.add(sig, name)
+
     @staticmethod
     def lookup_online(byte_sig: str, timeout: int, proxies=None) -> List[str]:
         """Lookup function signatures from 4byte.directory.
