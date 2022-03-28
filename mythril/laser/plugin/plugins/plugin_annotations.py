@@ -23,6 +23,71 @@ class MutationAnnotation(StateAnnotation):
     def persist_over_calls(self) -> bool:
         return True
 
+# class PCGasMeter:
+#     """
+#     PCGasMeter represents current machine gas meter statistics.
+#     """
+#     def __init__(self, min_opcode_gas_used=0, max_opcode_gas_used=0, mem_gas_used=0, num_invocations=0):
+#         self.min_opcode_gas_used = min_opcode_gas_used
+#         self.max_opcode_gas_used = max_opcode_gas_used
+#         self.mem_gas_used = mem_gas_used
+#         self.num_invocations = num_invocations
+
+#     def __copy__(self):
+#         return PCGasMeter(
+#             min_opcode_gas_used=self.min_opcode_gas_used, 
+#             max_opcode_gas_used=self.max_opcode_gas_used, 
+#             mem_gas_used=self.mem_gas_used,
+#             num_invocations=self.num_invocations
+#         )
+
+# class GasMeterTrackerAnnotation(StateAnnotation):
+#     """Gas Meter Tracker Annotation
+
+#     This annotation tracks gas usage per PC.
+#     """
+
+#     def __init__(self):
+#         self.gas_meter = {}
+
+#     def __copy__(self):
+#         result = GasMeterTrackerAnnotation()
+#         result.gas_meter = copy(self.gas_meter)
+#         return result
+
+class LoopGasMeterItem:
+    """
+    PCGasMeter represents current machine gas meter statistics.
+    """
+    def __init__(self, last_seen_gas_cost=None, iteration_gas_cost=None):
+        self.last_seen_gas_cost = last_seen_gas_cost
+        self.iteration_gas_cost = iteration_gas_cost or []
+
+    def __copy__(self):
+        return LoopGasMeterItem(
+            last_seen_gas_cost=self.last_seen_gas_cost, 
+            iteration_gas_cost=copy(self.iteration_gas_cost), 
+        )
+        
+    def merge(self, other: "LoopGasMeterItem"):
+        self.iteration_gas_cost = self.iteration_gas_cost + other.iteration_gas_cost
+
+class LoopGasMeterAnnotation(MergeableStateAnnotation):
+    """Function Gas Meter Annotation
+
+    This annotation tracks current function.
+    """
+    
+    def __init__(self):
+        self.loop_gas_meter = {}
+        
+    def __copy__(self):
+        result = LoopGasMeterAnnotation()
+        result.loop_gas_meter = copy(self.loop_gas_meter)
+        return result
+
+    
+
 class FunctionTrackerAnnotation(MergeableStateAnnotation):
     """Function Gas Meter Annotation
 

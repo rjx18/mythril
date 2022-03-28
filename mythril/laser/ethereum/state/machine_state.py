@@ -119,6 +119,10 @@ class MachineState:
         depth=0,
         max_gas_used=0,
         min_gas_used=0,
+        min_mem_gas_used=0,
+        max_mem_gas_used=0,
+        min_storage_gas_used=0,
+        max_storage_gas_used=0,
         prev_pc=-1,
     ) -> None:
         """Constructor for machineState.
@@ -140,6 +144,13 @@ class MachineState:
         self.gas_limit = gas_limit
         self.min_gas_used = min_gas_used  # lower gas usage bound
         self.max_gas_used = max_gas_used  # upper gas usage bound
+        
+        # opcode gas can be calculated from subtracting total gas used
+        self.min_mem_gas_used = min_mem_gas_used
+        self.max_mem_gas_used = max_mem_gas_used
+        self.min_storage_gas_used = min_storage_gas_used
+        self.max_storage_gas_used = max_storage_gas_used
+                
         self.pc_gas_meter = pc_gas_meter or dict()
         self.depth = depth
         self.prev_pc = prev_pc  # holds context of current pc
@@ -246,6 +257,10 @@ class MachineState:
             gas_limit=self.gas_limit,
             max_gas_used=self.max_gas_used,
             min_gas_used=self.min_gas_used,
+            min_mem_gas_used=self.min_mem_gas_used,
+            max_mem_gas_used=self.max_mem_gas_used,
+            min_storage_gas_used=self.min_storage_gas_used,
+            max_storage_gas_used=self.max_storage_gas_used,
             pc=self._pc,
             stack=copy(self.stack),
             memory=copy(self.memory),
@@ -299,5 +314,9 @@ class MachineState:
             pc_gas_meter=self.pc_gas_meter,
             max_gas_used=self.max_gas_used,
             min_gas_used=self.min_gas_used,
+            min_mem_gas_used=self.min_mem_gas_used,
+            max_mem_gas_used=self.max_mem_gas_used,
+            min_storage_gas_used=self.min_storage_gas_used,
+            max_storage_gas_used=self.max_storage_gas_used,
             prev_pc=self.prev_pc,
         )

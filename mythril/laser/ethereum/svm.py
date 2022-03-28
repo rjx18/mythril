@@ -106,12 +106,10 @@ class LaserEVM:
         self._start_sym_exec_hooks = []  # type: List[Callable]
         self._stop_sym_exec_hooks = []  # type: List[Callable]
         
-        self.creation_transaction_states = []
-        self.runtime_transaction_states = []
+        self.creation_transaction_states = [] # list of creation transaction states with gas tracker
+        self.runtime_transaction_states = [] # list of runtime transaction states with gas tracker
         
-        self.function_gas_meter = {}
-        
-        self.current_transaction_states = None
+        self.current_transaction_states = None # the current list of transaction states to append to
 
         self.iprof = iprof
         self.instr_pre_hook = {}  # type: Dict[str, List[Callable]]
@@ -392,8 +390,6 @@ class LaserEVM:
 
             log.debug("Ending transaction %s.", transaction)
             if return_global_state is None:
-                current_function = end_signal.global_state.current_function or "None"
-                print("Ending transaction for function " + current_function + ", but return_global_state is none, max gas used is " + str(end_signal.global_state.mstate.max_gas_used) + " and num final states are " + str(len(self.current_transaction_states)))
                 if (
                     not isinstance(transaction, ContractCreationTransaction)
                     or transaction.return_data
@@ -403,10 +399,6 @@ class LaserEVM:
                     self._add_world_state(end_signal.global_state)
 
                 self.current_transaction_states.append(end_signal.global_state)
-                if (end_signal.global_state.current_function != None):
-                    prev_max_gas = self.function_gas_meter.get(end_signal.global_state.current_function, 0)
-                    self.function_gas_meter[end_signal.global_state.current_function] = max(prev_max_gas, end_signal.global_state.mstate.max_gas_used)
-
                 new_global_states = []
             else:
                 # First execute the post hook for the transaction ending instruction

@@ -30,8 +30,6 @@ class GlobalState:
         transaction_stack=None,
         last_return_data=None,
         annotations=None,
-        current_function=None,
-        last_seen_function=None
     ) -> None:
         """Constructor for GlobalState.
 
@@ -53,8 +51,6 @@ class GlobalState:
         self.op_code = ""
         self.last_return_data = last_return_data
         self._annotations = annotations or []
-        self.current_function = current_function
-        self.last_seen_function = last_seen_function
 
     def add_annotations(self, annotations: List[StateAnnotation]):
         """
@@ -82,8 +78,6 @@ class GlobalState:
             transaction_stack=transaction_stack,
             last_return_data=self.last_return_data,
             annotations=[copy(a) for a in self._annotations],
-            current_function=self.current_function,
-            last_seen_function=self.last_seen_function
         )
 
     @property

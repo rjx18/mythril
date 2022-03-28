@@ -297,26 +297,6 @@ class Instruction:
         push_instruction = global_state.get_current_instruction()
         push_value = push_instruction["argument"]
         
-        signatures = SignatureDB()
-        
-        print(signatures.solidity_sigs.keys())
-        print(push_value)
-        
-        if (global_state.current_function == None):
-            if type(push_value) == tuple:
-                parsed_value = "0x"
-                for byte in push_value:
-                    parsed_byte = '{:02x}'.format(byte)
-                    parsed_value += parsed_byte
-            else: 
-                parsed_value = push_value.lower()
-        
-            print(parsed_value)
-            
-            if (parsed_value in signatures.solidity_sigs and global_state.environment.code.instruction_list[global_state.mstate.pc + 1]["opcode"] == "EQ"):
-                global_state.last_seen_function = parsed_value
-                print(f'MY_DEBUG Found a function being pushed: {parsed_value}')
-        
         try:
             length_of_value = 2 * int(push_instruction["opcode"][4:])
         except ValueError:
@@ -1686,10 +1666,6 @@ class Instruction:
                 new_state.mstate.pc = index
                 new_state.mstate.depth += 1
                 new_state.world_state.constraints.append(condi)
-                if new_state.last_seen_function != None and new_state.current_function == None:
-                    new_state.current_function = new_state.last_seen_function
-                    new_state.last_seen_function = None
-                    print(f'MY_DEBUG Jumping into function: {new_state.current_function}')
                 states.append(new_state)
             else:
                 log.debug("Pruned unreachable states.")
