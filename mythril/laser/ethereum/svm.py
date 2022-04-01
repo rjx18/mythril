@@ -106,17 +106,14 @@ class LaserEVM:
         self._start_sym_exec_hooks = []  # type: List[Callable]
         self._stop_sym_exec_hooks = []  # type: List[Callable]
         
-        self.creation_transaction_states = [] # list of creation transaction states with gas tracker
-        self.runtime_transaction_states = [] # list of runtime transaction states with gas tracker
-        
-        self.current_transaction_states = None # the current list of transaction states to append to
-
         self.iprof = iprof
         self.instr_pre_hook = {}  # type: Dict[str, List[Callable]]
         self.instr_post_hook = {}  # type: Dict[str, List[Callable]]
+        self.instr_gas_hook = {} # type: Dict[str, List[Callable]]
         for op in OPCODES:
             self.instr_pre_hook[op] = []
             self.instr_post_hook[op] = []
+            self.instr_gas_hook[op] = []
         log.info("LASER EVM initialized with dynamic loader: " + str(dynamic_loader))
 
     def extend_strategy(self, extension: ABCMeta, *args) -> None:
@@ -199,8 +196,6 @@ class LaserEVM:
         """
         self.time = datetime.now()
         
-        self.current_transaction_states = self.runtime_transaction_states
-
         for i in range(self.transaction_count):
             if len(self.open_states) == 0:
                 break
@@ -361,6 +356,7 @@ class LaserEVM:
                 self.dynamic_loader,
                 pre_hooks=self.instr_pre_hook[op_code],
                 post_hooks=self.instr_post_hook[op_code],
+                gas_hooks=self.instr_gas_hook[op_code],
             ).evaluate(global_state)
 
         except VmException as e:
@@ -398,7 +394,6 @@ class LaserEVM:
                     end_signal.global_state.world_state.node = global_state.node
                     self._add_world_state(end_signal.global_state)
 
-                self.current_transaction_states.append(end_signal.global_state)
                 new_global_states = []
             else:
                 # First execute the post hook for the transaction ending instruction
@@ -475,6 +470,7 @@ class LaserEVM:
             self.dynamic_loader,
             pre_hooks=self.instr_pre_hook[op_code],
             post_hooks=self.instr_post_hook[op_code],
+            gas_hooks=self.instr_gas_hook[op_code],
         ).evaluate(return_global_state, True)
 
         # In order to get a nice call graph we need to set the nodes here
@@ -618,6 +614,12 @@ class LaserEVM:
                     self.instr_pre_hook[op].append(hook(op))
             else:
                 self.instr_pre_hook[opcode].append(hook)
+        elif hook_type == "gas":
+            if opcode is None:
+                for op in OPCODES:
+                    self.instr_gas_hook[op].append(hook(op))
+            else:
+                self.instr_gas_hook[opcode].append(hook)
         else:
             if opcode is None:
                 for op in OPCODES:
@@ -702,9 +704,15 @@ class LaserEVM:
             :param func:
             :return:
             """
-            if op_code not in self.pre_hooks.keys():
-                self.pre_hooks[op_code] = []
-            self.pre_hooks[op_code].append(func)
+            if op_code is None:
+                for op in OPCODES:
+                    if op not in self.pre_hooks.keys():
+                        self.pre_hooks[op_code] = []
+                    self.pre_hooks[op_code].append(func)
+            else:
+                if op_code not in self.pre_hooks.keys():
+                    self.pre_hooks[op_code] = []
+                self.pre_hooks[op_code].append(func)
             return func
 
         return hook_decorator
@@ -722,9 +730,15 @@ class LaserEVM:
             :param func:
             :return:
             """
-            if op_code not in self.post_hooks.keys():
-                self.post_hooks[op_code] = []
-            self.post_hooks[op_code].append(func)
+            if op_code is None:
+                for op in OPCODES:
+                    if op not in self.post_hooks.keys():
+                        self.post_hooks[op_code] = []
+                    self.post_hooks[op_code].append(func)
+            else:
+                if op_code not in self.post_hooks.keys():
+                    self.post_hooks[op_code] = []
+                self.post_hooks[op_code].append(func)
             return func
 
         return hook_decorator

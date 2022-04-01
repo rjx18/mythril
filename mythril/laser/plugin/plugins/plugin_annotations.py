@@ -7,6 +7,8 @@ from copy import copy
 from typing import Dict, List, Set
 import logging
 
+import json
+
 log = logging.getLogger(__name__)
 
 
@@ -23,37 +25,96 @@ class MutationAnnotation(StateAnnotation):
     def persist_over_calls(self) -> bool:
         return True
 
-# class PCGasMeter:
-#     """
-#     PCGasMeter represents current machine gas meter statistics.
-#     """
-#     def __init__(self, min_opcode_gas_used=0, max_opcode_gas_used=0, mem_gas_used=0, num_invocations=0):
-#         self.min_opcode_gas_used = min_opcode_gas_used
-#         self.max_opcode_gas_used = max_opcode_gas_used
-#         self.mem_gas_used = mem_gas_used
-#         self.num_invocations = num_invocations
+class GasMeterItem:
+    """
+    PCGasMeter represents current machine gas meter statistics.
+    """
+    def __init__(self, min_opcode_gas_used=0, max_opcode_gas_used=0, mem_gas_used=0, min_storage_gas_used=0, max_storage_gas_used=0, num_invocations=0, num_tx=1):
+        self.min_opcode_gas_used = min_opcode_gas_used
+        self.max_opcode_gas_used = max_opcode_gas_used
+        self.mem_gas_used = mem_gas_used
+        self.min_storage_gas_used = min_storage_gas_used
+        self.max_storage_gas_used = max_storage_gas_used
+        self.num_invocations = num_invocations
+        
+        self.num_tx = num_tx
 
-#     def __copy__(self):
-#         return PCGasMeter(
-#             min_opcode_gas_used=self.min_opcode_gas_used, 
-#             max_opcode_gas_used=self.max_opcode_gas_used, 
-#             mem_gas_used=self.mem_gas_used,
-#             num_invocations=self.num_invocations
-#         )
+    def __copy__(self):
+        return GasMeterItem(
+            min_opcode_gas_used=self.min_opcode_gas_used, 
+            max_opcode_gas_used=self.max_opcode_gas_used, 
+            mem_gas_used=self.mem_gas_used,
+            min_storage_gas_used=self.min_storage_gas_used,
+            max_storage_gas_used=self.max_storage_gas_used,
+            num_invocations=self.num_invocations
+        )
+        
+    def merge(self, other: "GasMeterItem"):
+        self.min_opcode_gas_used += other.min_opcode_gas_used
+        self.max_opcode_gas_used += other.max_opcode_gas_used
+        self.mem_gas_used += other.mem_gas_used
+        self.min_storage_gas_used += other.min_storage_gas_used
+        self.max_storage_gas_used += other.max_storage_gas_used
+        
+        self.num_invocations += other.num_invocations
+        self.num_tx += other.num_tx
 
-# class GasMeterTrackerAnnotation(StateAnnotation):
-#     """Gas Meter Tracker Annotation
+    def __dict__(self):
+        total_max_opcode_gas = (self.max_opcode_gas_used + self.max_storage_gas_used)
+        mean_max_opcode_gas = total_max_opcode_gas / self.num_tx
+    
+        total_min_opcode_gas = (self.min_opcode_gas_used + self.min_storage_gas_used)
+        mean_min_opcode_gas = total_min_opcode_gas / self.num_tx
+        
+        total_mem_gas = self.mem_gas_used
+        mean_mem_gas = total_mem_gas / self.num_tx
+        
+        mean_wc_gas = mean_max_opcode_gas + mean_mem_gas      
+        
+        return dict(
+            numTx=self.num_tx,
+            totalMaxOpcodeGas=total_max_opcode_gas,
+            meanMaxOpcodeGas=mean_max_opcode_gas,
+            totalMinOpcodeGas=total_min_opcode_gas,
+            meanMinOpcodeGas=mean_min_opcode_gas,
+            totalMemGas=total_mem_gas,
+            meanMemGas=mean_mem_gas,
+            meanWcGas=mean_wc_gas
+        )
 
-#     This annotation tracks gas usage per PC.
-#     """
+    def to_json(self):
+        return json.dumps(self, default=lambda o: o.__dict__())
 
-#     def __init__(self):
-#         self.gas_meter = {}
+class GasMeterTrackerAnnotation(StateAnnotation):
+    """Gas Meter Tracker Annotation
 
-#     def __copy__(self):
-#         result = GasMeterTrackerAnnotation()
-#         result.gas_meter = copy(self.gas_meter)
-#         return result
+    This annotation tracks gas usage per PC.
+    """
+
+    def __init__(self):
+        self.last_seen_max_gas = 0
+        self.last_seen_min_gas = 0
+        self.last_seen_mem_gas = 0
+        self.last_seen_max_storage_gas = 0
+        self.last_seen_min_storage_gas = 0
+        
+        self.curr_tx_seen_pc = set()
+        
+        self.gas_meter = {}
+
+    def __copy__(self):
+        result = GasMeterTrackerAnnotation()
+        result.gas_meter = copy(self.gas_meter)
+        
+        result.last_seen_max_gas = self.last_seen_max_gas
+        result.last_seen_min_gas = self.last_seen_min_gas
+        result.last_seen_mem_gas = self.last_seen_mem_gas
+        result.last_seen_max_storage_gas = self.last_seen_max_storage_gas
+        result.last_seen_min_storage_gas = self.last_seen_min_storage_gas
+        
+        result.curr_tx_seen_pc = copy(self.curr_tx_seen_pc)
+        
+        return result
 
 class LoopGasMeterItem:
     """
@@ -72,7 +133,7 @@ class LoopGasMeterItem:
     def merge(self, other: "LoopGasMeterItem"):
         self.iteration_gas_cost = self.iteration_gas_cost + other.iteration_gas_cost
 
-class LoopGasMeterAnnotation(MergeableStateAnnotation):
+class LoopGasMeterAnnotation(StateAnnotation):
     """Function Gas Meter Annotation
 
     This annotation tracks current function.

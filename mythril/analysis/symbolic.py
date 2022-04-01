@@ -23,6 +23,8 @@ from mythril.laser.plugin.plugins import (
     MutationPrunerBuilder,
     DependencyPrunerBuilder,
     FunctionTrackerBuilder,
+    LoopGasMeterBuilder,
+    GasMeterBuilder,
     CoveragePluginBuilder,
     CallDepthLimitBuilder,
     InstructionProfilerBuilder,
@@ -141,6 +143,12 @@ class SymExecWrapper:
         
         # Function tracker
         self.plugin_loader.load(FunctionTrackerBuilder())
+        
+        # Gas meter
+        self.plugin_loader.load(GasMeterBuilder())
+        
+        # Loop gas meter
+        self.plugin_loader.load(LoopGasMeterBuilder())
         
         self.plugin_loader.instrument_virtual_machine(self.laser, None)
 

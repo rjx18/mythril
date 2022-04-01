@@ -12,3 +12,5 @@ from mythril.laser.plugin.plugins.mutation_pruner import MutationPrunerBuilder
 from mythril.laser.plugin.plugins.call_depth_limiter import CallDepthLimitBuilder
 from mythril.laser.plugin.plugins.instruction_profiler import InstructionProfilerBuilder
 from mythril.laser.plugin.plugins.function_tracker import FunctionTrackerBuilder 
+from mythril.laser.plugin.plugins.loop_gas_meter import LoopGasMeterBuilder
+from mythril.laser.plugin.plugins.gas_meter import GasMeterBuilder

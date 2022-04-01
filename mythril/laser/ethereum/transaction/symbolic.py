@@ -127,7 +127,6 @@ def execute_contract_creation(
     open_states = [world_state]
     new_account = None
     
-    laser_evm.current_transaction_states = laser_evm.creation_transaction_states
     for open_world_state in open_states:
         next_transaction_id = get_next_transaction_id()
         # call_data "should" be '[]', but it is easier to model the calldata symbolically

@@ -79,7 +79,7 @@ class LoopGasMeter(LaserPlugin):
             
             pc = state.instruction["address"]
             
-            loop_gas_item = annotation.loop_gas_meter.get(pc, LoopGasMeterItem)
+            loop_gas_item = annotation.loop_gas_meter.get(pc, LoopGasMeterItem())
             
             if (loop_gas_item.last_seen_gas_cost != None):
               current_iteration_cost = state.mstate.max_gas_used - loop_gas_item.last_seen_gas_cost
@@ -111,10 +111,13 @@ class LoopGasMeter(LaserPlugin):
             annotation = get_loop_gas_meter_annotation(state)
             
             for pc in annotation.loop_gas_meter.keys():
-              current_global_gas_item = self.global_loop_gas_meter.get(pc, LoopGasMeterItem)
-              annotation_pc_gas_item = annotation.loop_gas_meter[pc]
-              
-              current_global_gas_item.merge(annotation_pc_gas_item)
+                if pc not in self.global_loop_gas_meter:
+                    self.global_loop_gas_meter[pc] = LoopGasMeterItem()
+                
+                current_global_gas_item = self.global_loop_gas_meter[pc]
+                annotation_pc_gas_item = annotation.loop_gas_meter[pc]
+                
+                current_global_gas_item.merge(annotation_pc_gas_item)
             
         # @symbolic_vm.laser_hook("add_world_state")
         # def world_state_filter_hook(state: GlobalState):
