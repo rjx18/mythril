@@ -146,9 +146,15 @@ class SymExecWrapper:
         
         # Gas meter
         self.plugin_loader.load(GasMeterBuilder())
+        self.plugin_loader.add_args(
+            "gas-meter", contract=contract
+        )
         
         # Loop gas meter
         self.plugin_loader.load(LoopGasMeterBuilder())
+        self.plugin_loader.add_args(
+            "loop-gas-meter", contract=contract
+        )
         
         self.plugin_loader.instrument_virtual_machine(self.laser, None)
 

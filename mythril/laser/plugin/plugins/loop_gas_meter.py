@@ -5,6 +5,7 @@ from mythril.laser.plugin.signals import PluginSkipState
 from mythril.laser.plugin.plugins.plugin_annotations import (
     LoopGasMeterAnnotation,
     LoopGasMeterItem,
+    TraceItem
 )
 from mythril.laser.ethereum.state.global_state import GlobalState
 from mythril.laser.ethereum.transaction.transaction_models import (
@@ -44,7 +45,7 @@ class LoopGasMeterBuilder(PluginBuilder):
     name = "loop-gas-meter"
 
     def __call__(self, *args, **kwargs):
-        return LoopGasMeter()
+        return LoopGasMeter(kwargs["contract"])
 
 class LoopGasMeter(LaserPlugin):
     """Dependency Pruner Plugin
@@ -58,12 +59,14 @@ class LoopGasMeter(LaserPlugin):
     transaction can have an effect on that block or any of its successors.
     """
 
-    def __init__(self):
+    def __init__(self, contract):
         """Creates LoopGasMeter"""
         self._reset()
+        self.contract = contract
 
     def _reset(self):
         self.global_loop_gas_meter = {}
+        self.is_creation = True
 
     def initialize(self, symbolic_vm: LaserEVM) -> None:
         """Initializes the LoopGasMeter
@@ -71,23 +74,66 @@ class LoopGasMeter(LaserPlugin):
         :param symbolic_vm
         """
         self._reset()
+        
+        @symbolic_vm.laser_hook("start_sym_trans")
+        def start_sym_trans_hook():
+          self.is_creation = False
+          
+        @symbolic_vm.instr_hook("pre", None)
+        def add_pre_hook(op_code: str):
+            def add_opcode_pre_hook(state: GlobalState):
+                annotation = get_loop_gas_meter_annotation(state)
+                
+                pc = state.instruction["address"]
+                
+                source_info = self.contract.get_source_mapping(pc, constructor=self.is_creation)
+                if (source_info.solidity_file_idx == 0):
+                    annotation.curr_key = f'{source_info.offset}:{source_info.offset + source_info.length}'
+            return add_opcode_pre_hook
 
+# Need 2 matches to prevent too many false positives?
+
+# ci: A        ci: A       ci: A       ci: A
+# lj: None     lj: A       lj: C       lj: B
+# A         -> B        -> C        -> A ->                                 B                                     -> C === 
+# A            A, B        A, B, C     A, B, C, A  --> FOUND! Remove        A, B          A, B, C
+# Keep gas count at each trace location
+
+# ci: A        ci: A       ci: A       ci: A
+# lj: None     lj: A       lj: B       lj: C
+# A             -> B        -> C            -> B          ->      C ->                      A                         B             C                              === 
+# |A            |A, |B        |A, |B, |C     |A, |B, |C, |B       |A, |B, |C, |B, |C        A, B, C, A ===> Found!    A, B,         A, B, C
+#                                                                      i  i+1 len-2 len-1 
         @symbolic_vm.pre_hook("JUMPDEST")
         def check_jumpdest_arg(state: GlobalState):
-            print("Executing jumpdest hook for loop gas meter!")
             annotation = get_loop_gas_meter_annotation(state)
             
             pc = state.instruction["address"]
             
-            loop_gas_item = annotation.loop_gas_meter.get(pc, LoopGasMeterItem())
+            current_trace_item = TraceItem(pc, state.mstate.max_gas_used)
+            annotation.trace.append(current_trace_item)
             
-            if (loop_gas_item.last_seen_gas_cost != None):
-              current_iteration_cost = state.mstate.max_gas_used - loop_gas_item.last_seen_gas_cost
-              loop_gas_item.iteration_gas_cost.append(current_iteration_cost)
-              
-            loop_gas_item.last_seen_gas_cost = state.mstate.max_gas_used
+            (loop_head, loop_gas) = find_loop(annotation.trace)
             
-            annotation.loop_gas_meter[pc] = loop_gas_item
+            if loop_head is not None:
+                source_info = self.contract.get_source_mapping(loop_head, constructor=self.is_creation)
+            
+                if (source_info.solidity_file_idx == 0):
+                    annotation.curr_key = f'{source_info.offset}:{source_info.offset + source_info.length}'
+                    is_hidden_jumpdest = False
+                else:
+                    is_hidden_jumpdest = True
+                    
+                if (annotation.curr_key not in annotation.loop_gas_meter):
+                    annotation.loop_gas_meter[annotation.curr_key] = dict()
+                
+                key_gas_items = annotation.loop_gas_meter[annotation.curr_key]
+                
+                if (loop_head not in key_gas_items):
+                    key_gas_items[loop_head] = LoopGasMeterItem(is_hidden=is_hidden_jumpdest)
+                    
+                loop_gas_item = key_gas_items[loop_head]
+                loop_gas_item.iteration_gas_cost.append(loop_gas)
             
         @symbolic_vm.pre_hook("STOP")
         def stop_hook(state: GlobalState):
@@ -101,6 +147,31 @@ class LoopGasMeter(LaserPlugin):
         def revert_hook(state: GlobalState):
             _transaction_end(state)
 
+        def find_loop(trace):
+            found_loop_head = None
+            
+            loop_head_index = 0
+            
+            for loop_head_index in range(len(trace) - 3, -1, -1):
+                if trace[loop_head_index].pc == trace[-2].pc and trace[loop_head_index + 1].pc == trace[-1].pc:
+                    found_loop_head = trace[loop_head_index]
+                    break
+            
+            if found_loop_head:
+                found_pc = found_loop_head.pc
+                found_gas = found_loop_head.gas
+                
+                loop_iteration_gas = trace[-2].gas - found_gas
+                
+                # remove loop from trace to prevent finding it again next time
+                for i in range(len(trace) - 3, loop_head_index - 1, -1):
+                    del trace[i]
+                
+                return (found_pc, loop_iteration_gas)
+            else:
+                return (None, 0)
+            
+
         def _transaction_end(state: GlobalState) -> None:
             """When a stop or return is reached, the storage locations read along the path are entered into
             the dependency map for all nodes encountered in this path.
@@ -110,14 +181,22 @@ class LoopGasMeter(LaserPlugin):
 
             annotation = get_loop_gas_meter_annotation(state)
             
-            for pc in annotation.loop_gas_meter.keys():
-                if pc not in self.global_loop_gas_meter:
-                    self.global_loop_gas_meter[pc] = LoopGasMeterItem()
+            for key in annotation.loop_gas_meter.keys():
+                if key not in self.global_loop_gas_meter:
+                    self.global_loop_gas_meter[key] = dict()
+                    
+                key_gas_items = self.global_loop_gas_meter[key]
                 
-                current_global_gas_item = self.global_loop_gas_meter[pc]
-                annotation_pc_gas_item = annotation.loop_gas_meter[pc]
-                
-                current_global_gas_item.merge(annotation_pc_gas_item)
+                annotation_key_gas_items = annotation.loop_gas_meter[key]
+                    
+                for pc in annotation_key_gas_items:
+                    annotation_pc_gas_item = annotation_key_gas_items[pc]
+                    
+                    if pc not in key_gas_items:
+                        key_gas_items[pc] = LoopGasMeterItem(is_hidden=annotation_pc_gas_item.is_hidden)
+                        
+                    current_global_gas_item = key_gas_items[pc]
+                    current_global_gas_item.merge(annotation_pc_gas_item)
             
         # @symbolic_vm.laser_hook("add_world_state")
         # def world_state_filter_hook(state: GlobalState):

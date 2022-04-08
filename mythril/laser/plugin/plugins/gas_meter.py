@@ -42,7 +42,7 @@ class GasMeterBuilder(PluginBuilder):
     name = "gas-meter"
 
     def __call__(self, *args, **kwargs):
-        return GasMeter()
+        return GasMeter(kwargs["contract"])
 
 class GasMeter(LaserPlugin):
     """Dependency Pruner Plugin
@@ -56,14 +56,18 @@ class GasMeter(LaserPlugin):
     transaction can have an effect on that block or any of its successors.
     """
 
-    def __init__(self):
+    def __init__(self, contract):
         """Creates GasMeter"""
         self._reset()
+        self.contract = contract
 
     def _reset(self):
       self.runtime_gas_meter = {}
       self.creation_gas_meter = {}
-      self.current_gas_meter = self.creation_gas_meter
+      self.is_creation = True
+      
+    def current_gas_meter(self):
+        return self.creation_gas_meter if self.is_creation else self.runtime_gas_meter
 
     def initialize(self, symbolic_vm: LaserEVM) -> None:
         """Initializes the DependencyPruner
@@ -77,7 +81,7 @@ class GasMeter(LaserPlugin):
         
         @symbolic_vm.laser_hook("start_sym_trans")
         def start_sym_trans_hook():
-          self.current_gas_meter = self.runtime_gas_meter
+          self.is_creation = False
         # start of sym execution, set to runtime
         
 
@@ -91,32 +95,37 @@ class GasMeter(LaserPlugin):
                 # opcode = state.instruction["opcode"]
                 pc = state.instruction["address"]
                 
-                min_gas_used = state.mstate.min_gas_used - annotation.last_seen_min_gas
-                max_gas_used = state.mstate.max_gas_used - annotation.last_seen_max_gas
-                mem_gas_used = state.mstate.mem_gas_used - annotation.last_seen_mem_gas
-                min_storage_gas_used = state.mstate.min_storage_gas_used - annotation.last_seen_min_storage_gas
-                max_storage_gas_used = state.mstate.max_storage_gas_used - annotation.last_seen_max_storage_gas
+                source_info = self.contract.get_source_mapping(pc, constructor=self.is_creation)
+                if (source_info.solidity_file_idx == 0):
+                    annotation.curr_key = f'{source_info.offset}:{source_info.offset + source_info.length}'
                 
-                gas_meter_item = annotation.gas_meter.get(pc, GasMeterItem())
-                gas_meter_item.mem_gas_used += mem_gas_used
-                gas_meter_item.min_storage_gas_used += min_storage_gas_used
-                gas_meter_item.max_storage_gas_used += max_storage_gas_used
-                gas_meter_item.min_opcode_gas_used += min_gas_used - mem_gas_used - min_storage_gas_used
-                gas_meter_item.max_opcode_gas_used += max_gas_used - mem_gas_used - max_storage_gas_used
-                
-                gas_meter_item.num_invocations += 1
-                
-                annotation.last_seen_min_gas = state.mstate.min_gas_used
-                annotation.last_seen_max_gas = state.mstate.max_gas_used
-                annotation.last_seen_mem_gas = state.mstate.mem_gas_used
-                annotation.last_seen_min_storage_gas = state.mstate.min_storage_gas_used
-                annotation.last_seen_max_storage_gas = state.mstate.max_storage_gas_used
-                
-                # if pc not in self.curr_tx_seen_pc:
-                #   gas_meter_item.num_tx += 1
-                #   self.curr_tx_seen_pc.add(pc)
-                
-                annotation.gas_meter[pc] = gas_meter_item
+                if annotation.curr_key is not None:
+                    min_gas_used = state.mstate.min_gas_used - annotation.last_seen_min_gas
+                    max_gas_used = state.mstate.max_gas_used - annotation.last_seen_max_gas
+                    mem_gas_used = state.mstate.mem_gas_used - annotation.last_seen_mem_gas
+                    min_storage_gas_used = state.mstate.min_storage_gas_used - annotation.last_seen_min_storage_gas
+                    max_storage_gas_used = state.mstate.max_storage_gas_used - annotation.last_seen_max_storage_gas
+                    
+                    gas_meter_item = annotation.gas_meter.get(annotation.curr_key, GasMeterItem())
+                    gas_meter_item.mem_gas_used += mem_gas_used
+                    gas_meter_item.min_storage_gas_used += min_storage_gas_used
+                    gas_meter_item.max_storage_gas_used += max_storage_gas_used
+                    gas_meter_item.min_opcode_gas_used += min_gas_used - mem_gas_used - min_storage_gas_used
+                    gas_meter_item.max_opcode_gas_used += max_gas_used - mem_gas_used - max_storage_gas_used
+                    
+                    gas_meter_item.num_invocations += 1
+                    
+                    annotation.last_seen_min_gas = state.mstate.min_gas_used
+                    annotation.last_seen_max_gas = state.mstate.max_gas_used
+                    annotation.last_seen_mem_gas = state.mstate.mem_gas_used
+                    annotation.last_seen_min_storage_gas = state.mstate.min_storage_gas_used
+                    annotation.last_seen_max_storage_gas = state.mstate.max_storage_gas_used
+                    
+                    # if pc not in self.curr_tx_seen_pc:
+                    #   gas_meter_item.num_tx += 1
+                    #   self.curr_tx_seen_pc.add(pc)
+                    
+                    annotation.gas_meter[annotation.curr_key] = gas_meter_item
                 
                 # print("MY_DEBUG current max gas for pc " + str(pc) + " is " + str(gas_meter.max_opcode_gas_used))
             return add_opcode_gas_hook
@@ -144,14 +153,14 @@ class GasMeter(LaserPlugin):
             
             print("transaction ended!, num keys: " + str(len(annotation.gas_meter.keys())))
             
-            for pc in annotation.gas_meter.keys():
-              if pc not in self.current_gas_meter:
-                self.current_gas_meter[pc] = GasMeterItem(num_tx=0)
+            for key in annotation.gas_meter.keys():
+              if key not in self.current_gas_meter():
+                self.current_gas_meter()[key] = GasMeterItem(num_tx=0)
               
-              current_global_gas_item = self.current_gas_meter[pc]
-              annotation_pc_gas_item = annotation.gas_meter[pc]
+              current_global_gas_item = self.current_gas_meter()[key]
+              annotation_pc_gas_item = annotation.gas_meter[key]
               
               current_global_gas_item.merge(annotation_pc_gas_item)
               
-              print("MY_DEBUG transaction ended, current max gas meter for pc " + str(pc) + " is " + str(current_global_gas_item.max_opcode_gas_used) + " and num_tx is " + str(current_global_gas_item.num_tx))
+              print("MY_DEBUG transaction ended, current max gas meter for key " + str(key) + " is " + str(current_global_gas_item.max_opcode_gas_used) + " and num_tx is " + str(current_global_gas_item.num_tx))
 

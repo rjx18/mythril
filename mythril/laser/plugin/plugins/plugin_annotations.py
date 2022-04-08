@@ -9,6 +9,8 @@ import logging
 
 import json
 
+from collections import namedtuple
+
 log = logging.getLogger(__name__)
 
 
@@ -98,7 +100,7 @@ class GasMeterTrackerAnnotation(StateAnnotation):
         self.last_seen_max_storage_gas = 0
         self.last_seen_min_storage_gas = 0
         
-        self.curr_tx_seen_pc = set()
+        self.curr_key = None
         
         self.gas_meter = {}
 
@@ -112,7 +114,7 @@ class GasMeterTrackerAnnotation(StateAnnotation):
         result.last_seen_max_storage_gas = self.last_seen_max_storage_gas
         result.last_seen_min_storage_gas = self.last_seen_min_storage_gas
         
-        result.curr_tx_seen_pc = copy(self.curr_tx_seen_pc)
+        result.curr_key = self.curr_key
         
         return result
 
@@ -120,18 +122,20 @@ class LoopGasMeterItem:
     """
     PCGasMeter represents current machine gas meter statistics.
     """
-    def __init__(self, last_seen_gas_cost=None, iteration_gas_cost=None):
-        self.last_seen_gas_cost = last_seen_gas_cost
+    def __init__(self, iteration_gas_cost=None, is_hidden=False):
         self.iteration_gas_cost = iteration_gas_cost or []
+        self.is_hidden = is_hidden
 
     def __copy__(self):
         return LoopGasMeterItem(
-            last_seen_gas_cost=self.last_seen_gas_cost, 
             iteration_gas_cost=copy(self.iteration_gas_cost), 
+            is_hidden=self.is_hidden
         )
         
     def merge(self, other: "LoopGasMeterItem"):
         self.iteration_gas_cost = self.iteration_gas_cost + other.iteration_gas_cost
+
+TraceItem = namedtuple("TraceItem", "pc gas")
 
 class LoopGasMeterAnnotation(StateAnnotation):
     """Function Gas Meter Annotation
@@ -142,9 +146,14 @@ class LoopGasMeterAnnotation(StateAnnotation):
     def __init__(self):
         self.loop_gas_meter = {}
         
+        self.trace = []
+        self.curr_key = None
+        
     def __copy__(self):
         result = LoopGasMeterAnnotation()
         result.loop_gas_meter = copy(self.loop_gas_meter)
+        result.trace = copy(self.trace)
+        result.curr_key = self.curr_key
         return result
 
     
