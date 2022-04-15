@@ -62,26 +62,16 @@ class GasMeterItem:
         self.num_tx += other.num_tx
 
     def __dict__(self):
-        total_max_opcode_gas = (self.max_opcode_gas_used + self.max_storage_gas_used)
-        mean_max_opcode_gas = total_max_opcode_gas / self.num_tx
-    
-        total_min_opcode_gas = (self.min_opcode_gas_used + self.min_storage_gas_used)
-        mean_min_opcode_gas = total_min_opcode_gas / self.num_tx
-        
-        total_mem_gas = self.mem_gas_used
-        mean_mem_gas = total_mem_gas / self.num_tx
-        
-        mean_wc_gas = mean_max_opcode_gas + mean_mem_gas      
+        mean_max_total_gas = (self.max_opcode_gas_used + self.mem_gas_used + self.max_storage_gas_used) / self.num_tx
         
         return dict(
             numTx=self.num_tx,
-            totalMaxOpcodeGas=total_max_opcode_gas,
-            meanMaxOpcodeGas=mean_max_opcode_gas,
-            totalMinOpcodeGas=total_min_opcode_gas,
-            meanMinOpcodeGas=mean_min_opcode_gas,
-            totalMemGas=total_mem_gas,
-            meanMemGas=mean_mem_gas,
-            meanWcGas=mean_wc_gas
+            maxOpcodeGas=self.max_opcode_gas_used,
+            minOpcodeGas=self.min_opcode_gas_used,
+            memGas=self.mem_gas_used,
+            maxStorageGas=self.max_storage_gas_used,
+            minStorageGas=self.min_storage_gas_used,
+            meanMaxTotalGas=mean_max_total_gas
         )
 
     def to_json(self):

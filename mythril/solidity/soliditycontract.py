@@ -7,8 +7,7 @@ from typing import Union
 import mythril.laser.ethereum.util as helper
 from mythril.ethereum.evmcontract import EVMContract
 from mythril.ethereum.util import get_solc_json
-from mythril.exceptions import NoContractFoundError
-
+from mythril.exceptions import NotMatchingOnchainCodeError, NoContractFoundError
 log = logging.getLogger(__name__)
 
 
@@ -77,7 +76,7 @@ def get_contracts_from_file(input_file, solc_settings_json=None, solc_binary="so
                 solc_binary=solc_binary,
             )
 
-def get_contracts_from_json(compiled_json, input_file, input_file_contents):
+def get_contracts_from_json(compiled_json, input_file, input_file_contents, onchain_code=None):
     """
 
     :param input_file:
@@ -101,14 +100,15 @@ def get_contracts_from_json(compiled_json, input_file, input_file_contents):
                 input_file=input_file,
                 name=contract_name,
                 compiled_json=data,
-                input_file_contents=input_file_contents
+                input_file_contents=input_file_contents,
+                onchain_code=onchain_code
             )
 
 class SolidityContract(EVMContract):
     """Representation of a Solidity contract."""
 
     def __init__(
-        self, input_file=None, name=None, solc_settings_json=None, solc_binary="solc", compiled_json=None, input_file_contents=None
+        self, input_file=None, name=None, solc_settings_json=None, solc_binary="solc", compiled_json=None, input_file_contents=None, onchain_code=None
     ):
         if (compiled_json):
             data = compiled_json
@@ -160,7 +160,10 @@ class SolidityContract(EVMContract):
 
         self._get_solc_mappings(srcmap)
         self._get_solc_mappings(srcmap_constructor, constructor=True)
-
+        
+        if (onchain_code is not None and onchain_code != code):
+            raise NotMatchingOnchainCodeError(f"Onchain code does not match compiled code!")
+        
         super().__init__(code, creation_code, name=name)
 
     @staticmethod

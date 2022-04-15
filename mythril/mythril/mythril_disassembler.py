@@ -119,7 +119,7 @@ class MythrilDisassembler:
             )
         return address, self.contracts[-1]  # return address and contract object
 
-    def load_from_address(self, address: str) -> Tuple[str, EVMContract]:
+    def get_code_from_address(self, address: str) -> str:
         """
         Returns the contract given it's on chain address
         :param address: The on chain address of a contract
@@ -148,6 +148,39 @@ class MythrilDisassembler:
             raise CriticalError(
                 "Received an empty response from eth_getCode. Check the contract address and verify that you are on the correct chain."
             )
+        return code
+
+    def load_from_address(self, address: str) -> Tuple[str, EVMContract]:
+        """
+        Returns the contract given it's on chain address
+        :param address: The on chain address of a contract
+        :return: tuple(address, contract)
+        """
+        if not re.match(r"0x[a-fA-F0-9]{40}", address):
+            raise CriticalError("Invalid contract address. Expected format is '0x...'.")
+
+        if self.eth is None:
+            raise CriticalError(
+                "Please check whether the Infura key is set or use a different RPC method."
+            )
+
+        try:
+            code = self.eth.eth_getCode(address)
+            print("CODE retrieved:")
+            print(code)
+        except FileNotFoundError as e:
+            raise CriticalError("IPC error: " + str(e))
+        except ConnectionError:
+            raise CriticalError(
+                "Could not connect to RPC server. Make sure that your node is running and that RPC parameters are set correctly."
+            )
+        except Exception as e:
+            raise CriticalError("IPC / RPC error: " + str(e))
+
+        if code == "0x" or code == "0x0":
+            raise CriticalError(
+                "Received an empty response from eth_getCode. Check the contract address and verify that you are on the correct chain."
+            )
         else:
             self.contracts.append(
                 EVMContract(
@@ -157,14 +190,19 @@ class MythrilDisassembler:
         return address, self.contracts[-1]  # return address and contract object
 
     def load_from_solidity_json(
-        self, solidity_json: List, solidity_files: List[str], solidity_file_contents: List[str]
+        self, solidity_json: List, solidity_files: List[str], solidity_file_contents: List[str], onchain_address= None
     ) -> Tuple[str, List[SolidityContract]]:
         """
 
         :param solidity_files: List of solidity_files
         :return: tuple of address, contract class list
         """
-        address = util.get_indexed_address(0)
+        address = onchain_address or util.get_indexed_address(0)
+        verified_code = None
+        
+        if onchain_address is not None:
+            verified_code = self.get_code_from_address(address)
+        
         contracts = []
         for i in range(len(solidity_json)):
             json = solidity_json[i]
@@ -186,7 +224,8 @@ class MythrilDisassembler:
                         input_file=file,
                         name=contract_name,
                         compiled_json=json,
-                        input_file_contents=file_contents
+                        input_file_contents=file_contents,
+                        onchain_code=verified_code
                     )
                     self.contracts.append(contract)
                     contracts.append(contract)
@@ -194,7 +233,8 @@ class MythrilDisassembler:
                     for contract in get_contracts_from_json(
                         compiled_json=json,
                         input_file=file,
-                        input_file_contents=file_contents
+                        input_file_contents=file_contents,
+                        onchain_code=verified_code
                     ):
                         self.contracts.append(contract)
                         contracts.append(contract)

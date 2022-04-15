@@ -33,6 +33,12 @@ class CriticalError(MythrilBaseException):
 
     pass
 
+class NotMatchingOnchainCodeError(MythrilBaseException):
+    """A Mythril exception denoting the onchain code provided does not match
+    the compiled code."""
+
+    pass
+
 
 class DetectorNotFoundError(MythrilBaseException):
     """A Mythril exception denoting attempted usage of a non-existant

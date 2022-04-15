@@ -39,6 +39,13 @@ class EVMContract(persistent.Persistent):
         self.creation_disassembly = Disassembly(
             creation_code, enable_online_lookup=enable_online_lookup
         )
+        
+        # Try to get contract code using Etherscan API with backend
+        
+        # Add address to (any) Solidity contract by extending the class
+        # check if bytecode retrieved is the same as the one compiled by us
+        
+        # Allow for dynloader of Solidity contract
 
     @property
     def bytecode_hash(self):
