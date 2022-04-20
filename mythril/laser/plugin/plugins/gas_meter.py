@@ -96,8 +96,8 @@ class GasMeter(LaserPlugin):
                 pc = state.instruction["address"]
                 
                 source_info = self.contract.get_source_mapping(pc, constructor=self.is_creation)
-                if (source_info.solidity_file_idx == 0):
-                    annotation.curr_key = f'{source_info.offset}:{source_info.offset + source_info.length}'
+                if (self.contract.has_source(source_info.solidity_file_idx)):
+                    annotation.curr_key = f'{source_info.offset}:{source_info.offset + source_info.length}:{source_info.solidity_file_idx}'
                 
                 if annotation.curr_key is not None:
                     min_gas_used = state.mstate.min_gas_used - annotation.last_seen_min_gas

@@ -87,8 +87,8 @@ class LoopGasMeter(LaserPlugin):
                 pc = state.instruction["address"]
                 
                 source_info = self.contract.get_source_mapping(pc, constructor=self.is_creation)
-                if (source_info.solidity_file_idx == 0):
-                    annotation.curr_key = f'{source_info.offset}:{source_info.offset + source_info.length}'
+                if (self.contract.has_source(source_info.solidity_file_idx)):
+                    annotation.curr_key = f'{source_info.offset}:{source_info.offset + source_info.length}:{source_info.solidity_file_idx}'
             return add_opcode_pre_hook
 
 # Need 2 matches to prevent too many false positives?
@@ -118,8 +118,8 @@ class LoopGasMeter(LaserPlugin):
             if loop_head is not None:
                 source_info = self.contract.get_source_mapping(loop_head, constructor=self.is_creation)
             
-                if (source_info.solidity_file_idx == 0):
-                    annotation.curr_key = f'{source_info.offset}:{source_info.offset + source_info.length}'
+                if (self.contract.has_source(source_info.solidity_file_idx)):
+                    annotation.curr_key = f'{source_info.offset}:{source_info.offset + source_info.length}:{source_info.solidity_file_idx}'
                     is_hidden_jumpdest = False
                 else:
                     is_hidden_jumpdest = True

@@ -89,9 +89,12 @@ class FunctionTracker(LaserPlugin):
                 else: 
                     parsed_value = push_value.lower()
             
+                print(f'MY_DEBUG FT Found a function being pushed: {parsed_value}')
+            
                 if (parsed_value in self.signatures.solidity_sigs and state.environment.code.instruction_list[state.mstate.pc + 1]["opcode"] == "EQ"):
-                    annotation.last_seen_function = parsed_value
-                    print(f'MY_DEBUG FT Found a function being pushed: {parsed_value}')
+                    fn_name = self.signatures.solidity_sigs[parsed_value][0]
+                    annotation.last_seen_function = f'{parsed_value}:{fn_name}'
+                    print(f'MY_DEBUG FT pushed function: {parsed_value}')
             
             # print("MY_DEBUG current max gas for pc " + str(pc) + " is " + str(state.mstate.pc_gas_meter[pc].max_opcode_gas_used))
             

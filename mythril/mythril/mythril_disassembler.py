@@ -190,7 +190,7 @@ class MythrilDisassembler:
         return address, self.contracts[-1]  # return address and contract object
 
     def load_from_solidity_json(
-        self, solidity_json: List, solidity_files: List[str], solidity_file_contents: List[str], onchain_address= None
+        self, solidity_json: List, solidity_files: List, onchain_address=None, onchain_name=None
     ) -> Tuple[str, List[SolidityContract]]:
         """
 
@@ -207,21 +207,23 @@ class MythrilDisassembler:
         for i in range(len(solidity_json)):
             json = solidity_json[i]
             file = solidity_files[i]
-            file_contents = solidity_file_contents[i]
             
-            if ":" in file:
-                file, contract_name = file.split(":")
+            file_name = file["name"]
+            file_contents = file["content"]
+            
+            if ":" in file_name:
+                file_name, contract_name = file.split(":")
             else:
                 contract_name = None
             try:
                 # import signatures from solidity source
                 self.sigs.import_solidity_json(
                     json,
-                    file
+                    file_name
                 )
                 if contract_name is not None:
                     contract = SolidityContract(
-                        input_file=file,
+                        input_file=file_name,
                         name=contract_name,
                         compiled_json=json,
                         input_file_contents=file_contents,
@@ -232,9 +234,10 @@ class MythrilDisassembler:
                 else:
                     for contract in get_contracts_from_json(
                         compiled_json=json,
-                        input_file=file,
+                        input_file=file_name,
                         input_file_contents=file_contents,
-                        onchain_code=verified_code
+                        onchain_code=verified_code,
+                        onchain_name=onchain_name
                     ):
                         self.contracts.append(contract)
                         contracts.append(contract)

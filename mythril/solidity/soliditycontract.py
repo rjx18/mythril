@@ -76,7 +76,7 @@ def get_contracts_from_file(input_file, solc_settings_json=None, solc_binary="so
                 solc_binary=solc_binary,
             )
 
-def get_contracts_from_json(compiled_json, input_file, input_file_contents, onchain_code=None):
+def get_contracts_from_json(compiled_json, input_file, input_file_contents, onchain_code=None, onchain_name=None):
     """
 
     :param input_file:
@@ -84,7 +84,7 @@ def get_contracts_from_json(compiled_json, input_file, input_file_contents, onch
     :param solc_binary:
     """
     data = compiled_json
-
+    
     try:
         contract_names = data["contracts"][input_file].keys()
     except KeyError:
@@ -101,7 +101,7 @@ def get_contracts_from_json(compiled_json, input_file, input_file_contents, onch
                 name=contract_name,
                 compiled_json=data,
                 input_file_contents=input_file_contents,
-                onchain_code=onchain_code
+                onchain_code=onchain_code if onchain_name == contract_name else None
             )
 
 class SolidityContract(EVMContract):
@@ -113,11 +113,13 @@ class SolidityContract(EVMContract):
         if (compiled_json):
             data = compiled_json
             self.solc_indices = self.get_solc_indices(data, input_file_contents)
+            self.id_to_file_map = self.get_id_to_file_map(data)
         else:
             data = get_solc_json(
                 input_file, solc_settings_json=solc_settings_json, solc_binary=solc_binary
             )
             self.solc_indices = self.get_solc_indices(data)
+            self.id_to_file_map = self.get_id_to_file_map(data)
 
         self.solc_json = data
         self.input_file = input_file
@@ -161,7 +163,15 @@ class SolidityContract(EVMContract):
         self._get_solc_mappings(srcmap)
         self._get_solc_mappings(srcmap_constructor, constructor=True)
         
-        if (onchain_code is not None and onchain_code != code):
+        print(self.trim_metadata(onchain_code[2:]))
+        print('######################')
+        print('######################')
+        print('######################')
+        print('######################')
+        print('######################')
+        print(self.trim_metadata(code))
+
+        if (onchain_code is not None and self.trim_metadata(onchain_code[2:]) != self.trim_metadata(code)):
             raise NotMatchingOnchainCodeError(f"Onchain code does not match compiled code!")
         
         super().__init__(code, creation_code, name=name)
@@ -194,6 +204,7 @@ class SolidityContract(EVMContract):
                 SolidityContract.get_sources(
                     indices, source_data["evm"]["deployedBytecode"]
                 )
+                
         for source in data["sources"].values():
             full_contract_src_maps = SolidityContract.get_full_contract_src_maps(
                 source["ast"]
@@ -210,6 +221,24 @@ class SolidityContract(EVMContract):
                         source["ast"]["absolutePath"], code, full_contract_src_maps
                     )
         return indices
+
+    @staticmethod
+    def trim_metadata(code: str = None) -> str:
+        """
+        Returns bytecode without metadata at the end
+        """
+        metadata_size = int(code[-4:], 16) * 2 + 4
+        return code[:-metadata_size]
+
+    @staticmethod
+    def get_id_to_file_map(data: Dict) -> Dict:
+        """
+        Returns solc id to file map
+        """
+        id_to_file_map: Dict = {}
+        for filename in data["sources"].keys():
+            id_to_file_map[data["sources"][filename]["id"]] = filename
+        return id_to_file_map
 
     @staticmethod
     def get_full_contract_src_maps(ast: Dict) -> Set[str]:
@@ -288,6 +317,9 @@ class SolidityContract(EVMContract):
             return True
 
         return False
+
+    def has_source(self, file_index: int) -> bool:
+        return file_index in self.id_to_file_map
 
     def _get_solc_mappings(self, srcmap, constructor=False):
         """
