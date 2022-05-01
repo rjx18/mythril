@@ -146,7 +146,7 @@ class FunctionTracker(LaserPlugin):
               prev_max_gas = self.function_gas_meter.get(annotation.current_function, 0)
               self.function_gas_meter[annotation.current_function] = max(prev_max_gas, state.mstate.max_gas_used)
 
-              print("Current function " + annotation.current_function + " gas meter: " + str(self.function_gas_meter))
+            #   print("Current function " + annotation.current_function + " gas meter: " + str(self.function_gas_meter))
 
         # @symbolic_vm.laser_hook("add_world_state")
         # def world_state_filter_hook(state: GlobalState):
