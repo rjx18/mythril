@@ -275,8 +275,8 @@ class Instruction:
         result = instruction_mutator(global_state)
         self._execute_post_hooks(global_state)
         
-        print("Num global state annotations: " + str(global_state.annotations))
-        print("Num result annotations: " + str(result[0].annotations))
+        # print("Num global state annotations: " + str(global_state.annotations))
+        # print("Num result annotations: " + str(result[0].annotations))
 
         return result
 

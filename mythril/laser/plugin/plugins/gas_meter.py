@@ -30,7 +30,7 @@ def get_gas_meter_annotation(state: GlobalState) -> GasMeterTrackerAnnotation:
     )
 
     if len(annotations) == 0:
-        print("Annotation not found")
+        # print("Annotation not found")
         annotation = GasMeterTrackerAnnotation()
         state.annotate(annotation)
     else:
@@ -90,7 +90,7 @@ class GasMeter(LaserPlugin):
             def add_opcode_gas_hook(state: GlobalState):
                 annotation = get_gas_meter_annotation(state)
                 
-                print(f'Calling gas hook for {op_code}')
+                # print(f'Calling gas hook for {op_code}')
               
                 # opcode = state.instruction["opcode"]
                 pc = state.instruction["address"]
@@ -151,7 +151,7 @@ class GasMeter(LaserPlugin):
 
             annotation = get_gas_meter_annotation(state)
             
-            print("transaction ended!, num keys: " + str(len(annotation.gas_meter.keys())))
+            # print("transaction ended!, num keys: " + str(len(annotation.gas_meter.keys())))
             
             for key in annotation.gas_meter.keys():
               if key not in self.current_gas_meter():
@@ -162,5 +162,5 @@ class GasMeter(LaserPlugin):
               
               current_global_gas_item.merge(annotation_pc_gas_item)
               
-              print("MY_DEBUG transaction ended, current max gas meter for key " + str(key) + " is " + str(current_global_gas_item.max_opcode_gas_used) + " and num_tx is " + str(current_global_gas_item.num_tx))
+            #   print("MY_DEBUG transaction ended, current max gas meter for key " + str(key) + " is " + str(current_global_gas_item.max_opcode_gas_used) + " and num_tx is " + str(current_global_gas_item.num_tx))
 

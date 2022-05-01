@@ -215,7 +215,7 @@ class LaserEVM:
             for hook in self._start_sym_trans_hooks:
                 hook()
 
-            print("MY_DEBUG starting new transaction, num states: " + str(len(self.open_states)) + " , num strats: " + str(len(self.work_list)))
+            # print("MY_DEBUG starting new transaction, num states: " + str(len(self.open_states)) + " , num strats: " + str(len(self.work_list)))
             execute_message_call(self, address)
             
             for hook in self._stop_sym_trans_hooks:
@@ -329,7 +329,7 @@ class LaserEVM:
             self._add_world_state(global_state)
             return [], None
         
-        print("MY_DEBUG executing new opcode: " + op_code )
+        # print("MY_DEBUG executing new opcode: " + op_code )
         
         if len(global_state.mstate.stack) < get_required_stack_elements(op_code):
             error_msg = (
@@ -398,7 +398,7 @@ class LaserEVM:
             else:
                 # First execute the post hook for the transaction ending instruction
                 self._execute_post_hook(op_code, [end_signal.global_state])
-                print("Ending transaction, and return_global_state is not none")
+                # print("Ending transaction, and return_global_state is not none")
 
                 # Propagate annotations
                 new_annotations = [
@@ -417,7 +417,7 @@ class LaserEVM:
 
         self._execute_post_hook(op_code, new_global_states)
         
-        print("MY_DEBUG executing next states: " + str(len(new_global_states)) )
+        # print("MY_DEBUG executing next states: " + str(len(new_global_states)) )
 
         return new_global_states, op_code
 
@@ -445,7 +445,7 @@ class LaserEVM:
             return_global_state.mstate.pc
         ]["opcode"]
         
-        print("MY_DEBUG transaction resuming opcode is " + op_code + " at " + str(return_global_state.mstate.pc))
+        # print("MY_DEBUG transaction resuming opcode is " + op_code + " at " + str(return_global_state.mstate.pc))
 
         # Set execution result in the return_state
         return_global_state.last_return_data = return_data

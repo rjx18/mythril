@@ -33,7 +33,7 @@ def get_loop_gas_meter_annotation(state: GlobalState) -> LoopGasMeterAnnotation:
     )
     
     if len(annotations) == 0:
-        print("Annotation not found")
+        # print("Annotation not found")
         annotation = LoopGasMeterAnnotation()
         state.annotate(annotation)
     else:
