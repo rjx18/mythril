@@ -20,7 +20,7 @@ class CoverageStrategy(BasicSearchStrategy):
         self.super_strategy = super_strategy
         self.instruction_coverage_plugin = instruction_coverage_plugin
         BasicSearchStrategy.__init__(
-            self, super_strategy.work_list, super_strategy.max_depth
+            self, super_strategy.work_list, super_strategy.max_depth, super_strategy.skip_state_hooks
         )
 
     def get_strategic_global_state(self) -> GlobalState:

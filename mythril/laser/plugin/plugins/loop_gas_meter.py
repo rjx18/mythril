@@ -147,6 +147,10 @@ class LoopGasMeter(LaserPlugin):
         def revert_hook(state: GlobalState):
             _transaction_end(state)
 
+        @symbolic_vm.laser_hook("skip_state")
+        def skip_hook(state: GlobalState):
+            _transaction_end(state)
+
         def find_loop(trace):
             found_loop_head = None
             

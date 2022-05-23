@@ -90,10 +90,10 @@ class GasMeter(LaserPlugin):
             def add_opcode_gas_hook(state: GlobalState):
                 annotation = get_gas_meter_annotation(state)
                 
-                # print(f'Calling gas hook for {op_code}')
-              
                 # opcode = state.instruction["opcode"]
                 pc = state.instruction["address"]
+                
+                # print(f'Calling gas hook for {op_code} at {pc}')
                 
                 source_info = self.contract.get_source_mapping(pc, constructor=self.is_creation)
                 if (self.contract.has_source(source_info.solidity_file_idx)):
@@ -127,7 +127,7 @@ class GasMeter(LaserPlugin):
                     
                     annotation.gas_meter[annotation.curr_key] = gas_meter_item
                 
-                # print("MY_DEBUG current max gas for pc " + str(pc) + " is " + str(gas_meter.max_opcode_gas_used))
+                # print("MY_DEBUG current max gas for pc " + str(pc) + " at " + annotation.curr_key + " is " + str(gas_meter_item.max_opcode_gas_used))
             return add_opcode_gas_hook
 
         @symbolic_vm.pre_hook("STOP")
@@ -139,7 +139,11 @@ class GasMeter(LaserPlugin):
             _transaction_end(state)
             
         @symbolic_vm.pre_hook("REVERT")
-        def return_hook(state: GlobalState):
+        def revert_hook(state: GlobalState):
+            _transaction_end(state)
+            
+        @symbolic_vm.laser_hook("skip_state")
+        def skip_hook(state: GlobalState):
             _transaction_end(state)
 
         def _transaction_end(state: GlobalState) -> None:

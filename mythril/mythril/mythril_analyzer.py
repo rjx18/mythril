@@ -49,6 +49,7 @@ class MythrilAnalyzer:
         parallel_solving: bool = False,
         call_depth_limit: int = 3,
         solver_log: Optional[str] = None,
+        ignore_constraints = True
     ):
         """
 
@@ -75,6 +76,7 @@ class MythrilAnalyzer:
         args.call_depth_limit = call_depth_limit
         args.iprof = enable_iprof
         args.solver_log = solver_log
+        args.ignore_constraints = ignore_constraints
 
     def dump_statespace(self, contract: EVMContract = None) -> str:
         """

@@ -28,6 +28,7 @@ from mythril.laser.plugin.plugins import (
     CoveragePluginBuilder,
     CallDepthLimitBuilder,
     InstructionProfilerBuilder,
+    LoopMutationDetectorBuilder
 )
 from mythril.laser.ethereum.strategy.extensions.bounded_loops import (
     BoundedLoopsStrategy,
@@ -155,6 +156,12 @@ class SymExecWrapper:
             self.plugin_loader.load(LoopGasMeterBuilder())
             self.plugin_loader.add_args(
                 "loop-gas-meter", contract=contract
+            )
+            
+            # Loop mutation detector
+            self.plugin_loader.load(LoopMutationDetectorBuilder())
+            self.plugin_loader.add_args(
+                "loop-mutation-detector", contract=contract
             )
         
         self.plugin_loader.instrument_virtual_machine(self.laser, None)

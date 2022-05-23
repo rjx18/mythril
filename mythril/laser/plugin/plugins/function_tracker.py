@@ -79,6 +79,7 @@ class FunctionTracker(LaserPlugin):
               annotation = get_function_tracker_annotation(state)
               
               push_value = state.instruction["argument"]
+            #   print("Push value: " + str(push_value))
               
               if (annotation.current_function == None):
                 if type(push_value) == tuple:
@@ -131,6 +132,10 @@ class FunctionTracker(LaserPlugin):
             
         @symbolic_vm.pre_hook("REVERT")
         def revert_hook(state: GlobalState):
+            _transaction_end(state)
+
+        @symbolic_vm.laser_hook("skip_state")
+        def skip_hook(state: GlobalState):
             _transaction_end(state)
 
         def _transaction_end(state: GlobalState) -> None:

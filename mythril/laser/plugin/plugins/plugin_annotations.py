@@ -66,6 +66,7 @@ class GasMeterItem:
         
         return dict(
             numTx=self.num_tx,
+            numInvocations=self.num_invocations,
             maxOpcodeGas=self.max_opcode_gas_used,
             minOpcodeGas=self.min_opcode_gas_used,
             memGas=self.mem_gas_used,

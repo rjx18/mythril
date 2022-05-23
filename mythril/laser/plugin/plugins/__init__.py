@@ -14,3 +14,4 @@ from mythril.laser.plugin.plugins.instruction_profiler import InstructionProfile
 from mythril.laser.plugin.plugins.function_tracker import FunctionTrackerBuilder 
 from mythril.laser.plugin.plugins.loop_gas_meter import LoopGasMeterBuilder
 from mythril.laser.plugin.plugins.gas_meter import GasMeterBuilder
+from mythril.laser.plugin.plugins.loop_mutation_detector import LoopMutationDetectorBuilder

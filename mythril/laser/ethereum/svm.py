@@ -78,12 +78,6 @@ class LaserEVM:
         self.total_states = 0
         self.dynamic_loader = dynamic_loader
 
-        # TODO: What about using a deque here?
-        self.work_list = []  # type: List[GlobalState]
-        self.strategy = strategy(self.work_list, max_depth)
-        self.max_depth = max_depth
-        self.transaction_count = transaction_count
-
         self.execution_timeout = execution_timeout or 0
         self.create_timeout = create_timeout or 0
 
@@ -96,15 +90,23 @@ class LaserEVM:
 
         self.pre_hooks = defaultdict(list)  # type: DefaultDict[str, List[Callable]]
         self.post_hooks = defaultdict(list)  # type: DefaultDict[str, List[Callable]]
+        
 
         self._add_world_state_hooks = []  # type: List[Callable]
         self._execute_state_hooks = []  # type: List[Callable]
+        self._skip_state_hooks = []  # type: List[Callable]
 
         self._start_sym_trans_hooks = []  # type: List[Callable]
         self._stop_sym_trans_hooks = []  # type: List[Callable]
 
         self._start_sym_exec_hooks = []  # type: List[Callable]
         self._stop_sym_exec_hooks = []  # type: List[Callable]
+        
+        # TODO: What about using a deque here?
+        self.work_list = []  # type: List[GlobalState]
+        self.strategy = strategy(self.work_list, max_depth, self._skip_state_hooks)
+        self.max_depth = max_depth
+        self.transaction_count = transaction_count
         
         self.iprof = iprof
         self.instr_pre_hook = {}  # type: Dict[str, List[Callable]]
@@ -277,7 +279,7 @@ class LaserEVM:
             elif track_gas:
                 final_states.append(global_state)
             self.total_states += len(new_states)
-
+            
         return final_states if track_gas else None
 
     def _add_world_state(self, global_state: GlobalState):
@@ -375,6 +377,7 @@ class LaserEVM:
             )
 
             log.debug("Starting new transaction %s", start_signal.transaction)
+
 
             return [new_global_state], op_code
 
@@ -601,6 +604,8 @@ class LaserEVM:
             self._start_sym_trans_hooks.append(hook)
         elif hook_type == "stop_sym_trans":
             self._stop_sym_trans_hooks.append(hook)
+        elif hook_type == "skip_state":
+            self._skip_state_hooks.append(hook)
         else:
             raise ValueError(
                 "Invalid hook type %s. Must be one of {add_world_state}", hook_type

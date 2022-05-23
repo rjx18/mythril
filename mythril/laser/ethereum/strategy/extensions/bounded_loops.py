@@ -42,7 +42,7 @@ class BoundedLoopsStrategy(BasicSearchStrategy):
         )
 
         BasicSearchStrategy.__init__(
-            self, super_strategy.work_list, super_strategy.max_depth
+            self, super_strategy.work_list, super_strategy.max_depth, super_strategy.skip_state_hooks
         )
 
     @staticmethod
@@ -140,6 +140,8 @@ class BoundedLoopsStrategy(BasicSearchStrategy):
 
             elif count > self.bound:
                 log.debug("Loop bound reached, skipping state")
+                for hook in self.skip_state_hooks:
+                    hook(state)
                 continue
 
             return state

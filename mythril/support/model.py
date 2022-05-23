@@ -22,12 +22,21 @@ def get_model(constraints, minimize=(), maximize=(), enforce_execution_time=True
     :param enforce_execution_time: Bool variable which enforces --execution-timeout's time
     :return:
     """
+    
+    
     s = Optimize()
     timeout = args.solver_timeout
+    
+    ignore_constraints = args.ignore_constraints
+    
     if enforce_execution_time:
         timeout = min(timeout, time_handler.time_remaining() - 500)
         if timeout <= 0:
             raise UnsatError
+    
+    if ignore_constraints:
+        return    
+    
     s.set_timeout(timeout)
     for constraint in constraints:
         if type(constraint) == bool and not constraint:
