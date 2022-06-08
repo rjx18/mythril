@@ -96,15 +96,6 @@ def get_contracts_from_json(compiled_json, input_file, input_file_contents, onch
                 "object"
             ]
         ):
-            # print(onchain_name)
-            # print("###################################################")
-            # print(contract_name)
-            # print("###################################################")
-            # print(onchain_code)
-            # print("###################################################")
-            # print(data["contracts"][input_file][contract_name]["evm"]["deployedBytecode"][
-            #     "object"
-            # ])
             
             yield SolidityContract(
                 input_file=input_file,
@@ -173,14 +164,6 @@ class SolidityContract(EVMContract):
         self._get_solc_mappings(srcmap)
         self._get_solc_mappings(srcmap_constructor, constructor=True)
         
-        # print(self.trim_metadata(onchain_code[2:]))
-        # print('######################')
-        # print('######################')
-        # print('######################')
-        # print('######################')
-        # print('######################')
-        # print(self.trim_metadata(code))
-
         if (onchain_code is not None and self.trim_metadata(onchain_code[2:]) != self.trim_metadata(code)):
             raise NotMatchingOnchainCodeError(f"Onchain code does not match compiled code. Please check if the contract address is correct, and you are executing the correct contract that was deployed.")
         

@@ -47,7 +47,6 @@ class InstructionCoveragePlugin(LaserPlugin):
 
         @symbolic_vm.laser_hook("stop_sym_exec")
         def stop_sym_exec_hook():
-            # Print results
             for code, code_cov in self.coverage.items():
                 if sum(code_cov[1]) == 0 and code_cov[0] == 0:
                     cov_percentage = 0

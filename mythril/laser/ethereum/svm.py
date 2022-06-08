@@ -217,13 +217,11 @@ class LaserEVM:
             for hook in self._start_sym_trans_hooks:
                 hook()
 
-            # print("MY_DEBUG starting new transaction, num states: " + str(len(self.open_states)) + " , num strats: " + str(len(self.work_list)))
             execute_message_call(self, address)
             
             for hook in self._stop_sym_trans_hooks:
                 hook()
                 
-        # print("Total final states collected = " + str(len(self.transaction_final_states)))
 
     def _check_create_termination(self) -> bool:
         if len(self.open_states) != 0:
@@ -248,10 +246,7 @@ class LaserEVM:
         """
         final_states = []  # type: List[GlobalState]
         
-        # print("MY_DEBUG running exec num instructions " + str(len()))
-        
         for global_state in self.strategy:
-            # print("MY_DEBUG executing new state, num instructions " + str(len(global_state.environment.code.instruction_list)))
             if create and self._check_create_termination():
                 log.debug("Hit create timeout, returning.")
                 return final_states + [global_state] if track_gas else None
@@ -331,8 +326,6 @@ class LaserEVM:
             self._add_world_state(global_state)
             return [], None
         
-        # print("MY_DEBUG executing new opcode: " + op_code )
-        
         if len(global_state.mstate.stack) < get_required_stack_elements(op_code):
             error_msg = (
                 "Stack Underflow Exception due to insufficient "
@@ -401,7 +394,6 @@ class LaserEVM:
             else:
                 # First execute the post hook for the transaction ending instruction
                 self._execute_post_hook(op_code, [end_signal.global_state])
-                # print("Ending transaction, and return_global_state is not none")
 
                 # Propagate annotations
                 new_annotations = [
@@ -420,8 +412,6 @@ class LaserEVM:
 
         self._execute_post_hook(op_code, new_global_states)
         
-        # print("MY_DEBUG executing next states: " + str(len(new_global_states)) )
-
         return new_global_states, op_code
 
     def _end_message_call(
@@ -448,8 +438,6 @@ class LaserEVM:
             return_global_state.mstate.pc
         ]["opcode"]
         
-        # print("MY_DEBUG transaction resuming opcode is " + op_code + " at " + str(return_global_state.mstate.pc))
-
         # Set execution result in the return_state
         return_global_state.last_return_data = return_data
         if not revert_changes:

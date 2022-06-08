@@ -94,7 +94,6 @@ class LoopMutationDetector(LaserPlugin):
 
         @symbolic_vm.instr_hook("gas", "SSTORE")
         def sstore_hook(state: GlobalState):
-            # print("Executing push hook!")
             annotation = get_jumpdest_count_annotation(state)
             
             in_loop = self.check_in_explicit_loop(annotation.trace)
@@ -105,12 +104,10 @@ class LoopMutationDetector(LaserPlugin):
               if gas_annotation.curr_key is not None:
                 self.detected_keys.add(gas_annotation.curr_key)
             
-            # print("MY_DEBUG current max gas for pc " + str(pc) + " is " + str(state.mstate.pc_gas_meter[pc].max_opcode_gas_used))
           
         
         @symbolic_vm.instr_hook("gas", "SLOAD")
         def sload_hook(state: GlobalState):
-            # print("Executing push hook!")
             annotation = get_jumpdest_count_annotation(state)
             
             in_loop = self.check_in_explicit_loop(annotation.trace)
@@ -121,5 +118,4 @@ class LoopMutationDetector(LaserPlugin):
               if gas_annotation.curr_key is not None:
                 self.detected_keys.add(gas_annotation.curr_key)
             
-            # print("MY_DEBUG current max gas for pc " + str(pc) + " is " + str(state.mstate.pc_gas_meter[pc].max_opcode_gas_used))
           

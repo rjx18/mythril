@@ -105,8 +105,6 @@ def execute_message_call(laser_evm, callee_address: BitVec) -> None:
         )
         _setup_global_state_for_execution(laser_evm, transaction)
         
-        # print("Set up global state, instructions: " + str(laser_evm.work_list[0].environment.code.instruction_list))
-
     laser_evm.exec()
 
 

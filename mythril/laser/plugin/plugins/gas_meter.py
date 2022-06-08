@@ -30,7 +30,6 @@ def get_gas_meter_annotation(state: GlobalState) -> GasMeterTrackerAnnotation:
     )
 
     if len(annotations) == 0:
-        # print("Annotation not found")
         annotation = GasMeterTrackerAnnotation()
         state.annotate(annotation)
     else:
@@ -76,13 +75,9 @@ class GasMeter(LaserPlugin):
         """
         self._reset()
 
-        # @symbolic_vm.laser_hook("start_sym_exec")
-        # start of sym execution, set to creation first
-        
         @symbolic_vm.laser_hook("start_sym_trans")
         def start_sym_trans_hook():
           self.is_creation = False
-        # start of sym execution, set to runtime
         
 
         @symbolic_vm.instr_hook("gas", None)
@@ -90,10 +85,7 @@ class GasMeter(LaserPlugin):
             def add_opcode_gas_hook(state: GlobalState):
                 annotation = get_gas_meter_annotation(state)
                 
-                # opcode = state.instruction["opcode"]
                 pc = state.instruction["address"]
-                
-                # print(f'Calling gas hook for {op_code} at {pc}')
                 
                 source_info = self.contract.get_source_mapping(pc, constructor=self.is_creation)
                 if (self.contract.has_source(source_info.solidity_file_idx)):
@@ -121,13 +113,8 @@ class GasMeter(LaserPlugin):
                     annotation.last_seen_min_storage_gas = state.mstate.min_storage_gas_used
                     annotation.last_seen_max_storage_gas = state.mstate.max_storage_gas_used
                     
-                    # if pc not in self.curr_tx_seen_pc:
-                    #   gas_meter_item.num_tx += 1
-                    #   self.curr_tx_seen_pc.add(pc)
-                    
                     annotation.gas_meter[annotation.curr_key] = gas_meter_item
                 
-                # print("MY_DEBUG current max gas for pc " + str(pc) + " at " + annotation.curr_key + " is " + str(gas_meter_item.max_opcode_gas_used))
             return add_opcode_gas_hook
 
         @symbolic_vm.pre_hook("STOP")
@@ -155,8 +142,6 @@ class GasMeter(LaserPlugin):
 
             annotation = get_gas_meter_annotation(state)
             
-            # print("transaction ended!, num keys: " + str(len(annotation.gas_meter.keys())))
-            
             for key in annotation.gas_meter.keys():
               if key not in self.current_gas_meter():
                 self.current_gas_meter()[key] = GasMeterItem(num_tx=0)
@@ -166,5 +151,4 @@ class GasMeter(LaserPlugin):
               
               current_global_gas_item.merge(annotation_pc_gas_item)
               
-            #   print("MY_DEBUG transaction ended, current max gas meter for key " + str(key) + " is " + str(current_global_gas_item.max_opcode_gas_used) + " and num_tx is " + str(current_global_gas_item.num_tx))
 
